@@ -33,8 +33,8 @@ const InvestmentDashboard = ({
     aktifYatirimAy, setAktifYatirimAy,
     filtreYatirimTuru, setFiltreYatirimTuru,
     mevcutAylar,
-    islemSil,
-    fiyatGuncelle,
+    // Actions
+    islemSil, portfoySil, fiyatGuncelle,
     // BES
     besVerisi,
     toplamBesYatirimi,
@@ -42,10 +42,30 @@ const InvestmentDashboard = ({
     islemEkle,
     besOdemeYap,
     portfoyGuncelDegeri,
-    portfoySil // Added prop
+    tumIslemler, // NEW PROP
+    pozisyonSil // NEW PROP
 }) => {
-
+    const cardStyle = {
+        background: 'white',
+        borderRadius: '20px',
+        padding: '25px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+        border: '1px solid rgba(255,255,255,0.8)'
+    };
     const formatPara = (tutar) => gizliMod ? "**** ₺" : formatCurrencyPlain(tutar);
+
+    const { netProfit } = React.useMemo(() => {
+        let pl = 0;
+        (yatirimIslemleri || []).forEach(i => {
+            if (i.islemTipi === 'yatirim_satis' && i.alisBirimFiyat && i.birimFiyat && i.adet) {
+                const maliyet = parseFloat(i.alisBirimFiyat);
+                const satis = parseFloat(i.birimFiyat);
+                const kar = (satis - maliyet) * parseFloat(i.adet);
+                pl += kar;
+            }
+        });
+        return { netProfit: pl };
+    }, [yatirimIslemleri]);
 
     const COLORS_MAP = {
         'Hisse': '#3182ce',
@@ -56,7 +76,7 @@ const InvestmentDashboard = ({
 
     const aggregatedPortfoy = React.useMemo(() => {
         const groups = {};
-        portfoy.forEach(item => {
+        (portfoy || []).forEach(item => {
             const key = (item.sembol || "").trim().toUpperCase();
             if (!groups[key]) {
                 groups[key] = {
@@ -124,7 +144,7 @@ const InvestmentDashboard = ({
                         <ResponsiveContainer width="100%" height={220}>
                             <PieChart>
                                 <Pie
-                                    data={genelVarlikVerisi}
+                                    data={genelVarlikVerisi || []}
                                     cx="50%"
                                     cy="50%"
                                     innerRadius={45}
@@ -133,7 +153,7 @@ const InvestmentDashboard = ({
                                     dataKey="value"
                                     label={({ name }) => name}
                                 >
-                                    {genelVarlikVerisi.map((entry, index) => (
+                                    {(genelVarlikVerisi || []).map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS_MAP[entry.name] || COLORS_GENEL[index % COLORS_GENEL.length]} />
                                     ))}
                                 </Pie>
@@ -186,13 +206,17 @@ const InvestmentDashboard = ({
                             })}</tbody>
                         </table>
                     </div>
+
+                    <div style={{ marginTop: '10px', fontSize: '11px', color: '#a0aec0', textAlign: 'right', fontStyle: 'italic' }}>
+                        ⚠️ BIST verileri Yahoo Finance kaynaklı olup 15 dk gecikmeli olabilir.
+                    </div>
                 </div>
 
                 {/* SAĞ: VARLIK DAĞILIMI */}
                 <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    {portfoy.length > 0 ?
+                    {(portfoy || []).length > 0 ?
                         <>
-                            <ResponsiveContainer width="100%" height={300}><PieChart><Pie data={portfoyVerisi} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name }) => name}>{portfoyVerisi.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS_PORTFOLIO[index % COLORS_PORTFOLIO.length]} />))}</Pie><Tooltip formatter={(value) => gizliMod ? "****" : `${value.toLocaleString()} ₺`} /></PieChart></ResponsiveContainer>
+                            <ResponsiveContainer width="100%" height={300}><PieChart><Pie data={portfoyVerisi || []} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value" label={({ name }) => name}>{(portfoyVerisi || []).map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS_PORTFOLIO[index % COLORS_PORTFOLIO.length]} />))}</Pie><Tooltip formatter={(value) => gizliMod ? "****" : `${value.toLocaleString()} ₺`} /></PieChart></ResponsiveContainer>
                             <div style={{ marginTop: '-20px', fontSize: '24px', fontWeight: 'bold', color: '#2d3748' }}>
                                 {formatPara(portfoyGuncelDegeri)}
                             </div>
@@ -216,34 +240,38 @@ const InvestmentDashboard = ({
             />
 
             {/* 3. SATIR: YENİ İŞLEM VE GEÇMİŞ TABLOSU */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '25px', marginBottom: '30px' }}>
-
-                {/* SOL: YENİ YATIRIM FORMU */}
-                <div style={{ ...cardStyle, background: '#f0fff4', border: '1px solid #9ae6b4' }}>
+            {/* YENİ YATIRIM EKLEME ALANI */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '25px', marginBottom: '30px', alignItems: 'start' }}>
+                {/* SOL: YENİ YATIRIM EKLEME FORM */}
+                <div style={{ ...cardStyle, height: '500px', display: 'flex', flexDirection: 'column', background: '#f0fff4', border: '1px solid #9ae6b4' }}>
                     <h4 style={{ marginTop: 0, marginBottom: '20px', color: '#2f855a' }}>📈 Yeni Yatırım Varlığı Al</h4>
                     <form onSubmit={yatirimAl} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <input placeholder="Sembol (THYAO, GRAM...)" value={sembol} onChange={e => setSembol(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }} />
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <input type="number" placeholder="Adet" value={adet} onChange={e => setAdet(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }} />
-                            <select value={varlikTuru} onChange={e => setVarlikTuru(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }}>
-                                {yatirimTurleri.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                            <input type="number" placeholder="Alış Fiyatı" value={alisFiyati} onChange={e => setAlisFiyati(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }} />
                         </div>
-                        <input type="number" placeholder="Birim Alış Fiyatı" value={alisFiyati} onChange={e => setAlisFiyati(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }} />
-                        <select value={yatirimHesapId} onChange={e => setYatirimHesapId(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }} required><option value="">Ödeme Hangi Hesaptan?</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({formatPara(h.guncelBakiye)})</option>)}</select>
+                        <select value={varlikTuru} onChange={e => setVarlikTuru(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }}>
+                            {(yatirimTurleri || []).map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <select value={yatirimHesapId} onChange={e => setYatirimHesapId(e.target.value)} style={{ ...inputStyle, border: '1px solid #9ae6b4' }} required>
+                            <option value="">Ödeme Yapılacak Hesap Seç</option>
+                            {(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({formatPara(h.guncelBakiye)})</option>)}
+                        </select>
                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'green' }}>Toplam Tutar: {adet && alisFiyati ? formatPara(adet * alisFiyati) : '0 ₺'}</div>
-                        <button type="submit" style={{ width: '100%', background: '#38a169', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}>SATIN AL</button>
+                        <button type="submit" disabled={guncelleniyor} style={{ padding: '12px', background: '#48bb78', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                            {guncelleniyor ? 'İşleniyor...' : 'VARLIK EKLE'}
+                        </button>
                     </form>
                 </div>
 
                 {/* SAĞ: YATIRIM İŞLEM GEÇMİŞİ */}
-                {/* SAĞ: YATIRIM İŞLEM GEÇMİŞİ */}
-                <div style={{ ...cardStyle, maxWidth: '100%', overflow: 'hidden' }}>
+                <div style={{ ...cardStyle, maxWidth: '100%', overflow: 'hidden', height: '500px', display: 'flex', flexDirection: 'column' }}>
                     {/* ÜST BÖLÜM: AYLAR */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
                         <h4 style={{ marginTop: 0, color: '#2c3e50', margin: 0 }}>📜 Yatırım İşlem Geçmişi</h4>
                         <div className="no-scrollbar" style={{ display: 'flex', gap: '5px', alignItems: 'center', overflowX: 'auto', paddingBottom: '5px', maxWidth: '100%', whiteSpace: 'nowrap' }}>
-                            {mevcutAylar.map(ay => (
+                            {(mevcutAylar || []).map(ay => (
                                 <button key={ay} onClick={() => setAktifYatirimAy(ay)} style={{ padding: '5px 10px', fontSize: '12px', borderRadius: '15px', border: 'none', cursor: 'pointer', background: aktifYatirimAy === ay ? '#2c3e50' : '#edf2f7', color: aktifYatirimAy === ay ? 'white' : '#4a5568', fontWeight: 'bold', flexShrink: 0 }}>{ay}</button>
                             ))}
                         </div>
@@ -251,8 +279,8 @@ const InvestmentDashboard = ({
 
                     {/* GELİŞMİŞ FİLTRELEME ALANI */}
                     <div style={{ background: '#f7fafc', padding: '15px', borderRadius: '10px', marginBottom: '15px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', border: '1px solid #edf2f7' }}>
-                        <div style={{ flex: 2, minWidth: '200px', display: 'flex', alignItems: 'center', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 10px' }}>
-                            <span style={{ fontSize: '16px' }}>🔍</span>
+                        <div style={{ flex: 1, minWidth: '150px', display: 'flex', alignItems: 'center', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 10px' }}>
+                            <span style={{ fontSize: '14px', marginRight: '5px' }}>🔍</span>
                             <input
                                 type="text"
                                 placeholder="Yatırım işlem ara..."
@@ -262,46 +290,355 @@ const InvestmentDashboard = ({
                             />
                             {yatirimArama && <span onClick={() => setYatirimArama("")} style={{ cursor: 'pointer', color: '#aaa', fontWeight: 'bold' }}>X</span>}
                         </div>
-                        <select
-                            value={filtreYatirimTuru}
-                            onChange={e => setFiltreYatirimTuru(e.target.value)}
-                            style={{ flex: 1, minWidth: '120px', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', cursor: 'pointer', fontSize: '13px', backgroundColor: '#ffffff', color: '#333' }}
-                        >
-                            <option value="Tümü">Tüm Türler</option>
-                            {yatirimTurleri.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
                     </div>
 
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', color: '#333' }}>
-                        <thead><tr style={{ textAlign: 'left', color: '#718096', borderBottom: '2px solid #e2e8f0' }}><th style={{ padding: '10px' }}>Tarih</th><th style={{ padding: '10px' }}>Hesap</th><th style={{ padding: '10px' }}>Tür</th><th style={{ padding: '10px' }}>İşlem</th><th style={{ padding: '10px' }}>Tutar</th><th></th><th></th></tr></thead>
-                        <tbody>
-                            {yatirimIslemleri.map(i => {
-                                const hesap = hesaplar.find(h => h.id === i.hesapId);
-                                const hesapAdi = hesap ? hesap.hesapAdi : "Bilinmeyen Hesap";
-                                return (
-                                    <tr key={i.id} style={{ borderBottom: '1px solid #f7fafc' }}>
-                                        <td style={{ padding: '10px', color: '#718096' }}>{tarihFormatla(i.tarih)}</td>
-                                        <td style={{ padding: '10px' }}>{hesapAdi}</td>
-                                        <td style={{ padding: '10px' }}>{i.yatirimTuru || i.kategori || "Diğer"}</td>
-                                        <td style={{ padding: '10px' }}>{i.aciklama}</td>
-                                        <td style={{ padding: '10px', fontWeight: 'bold', color: i.islemTipi === 'yatirim_alis' ? 'red' : 'green' }}>{formatPara(i.tutar)}</td>
-                                        <td><span onClick={() => modalAc('duzenle_islem', i)} style={{ cursor: 'pointer' }}>✏️</span></td>
-                                        <td><span onClick={() => islemSil(i.id)} style={{ cursor: 'pointer' }}>🗑️</span></td>
+                    {/* LİSTE */}
+                    <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
+                        {(yatirimIslemleri || []).length === 0 ? (
+                            <div style={{ textAlign: 'center', color: '#a0aec0', marginTop: '50px', fontStyle: 'italic' }}>Bu ay için işlem bulunamadı.</div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                                    <tr style={{ color: '#718096', textAlign: 'left', fontSize: '12px' }}>
+                                        <th style={{ padding: '10px' }}>Tarih</th>
+                                        <th style={{ padding: '10px' }}>Hesap</th>
+                                        <th style={{ padding: '10px' }}>Tür</th>
+                                        <th style={{ padding: '10px' }}>Adet</th>
+                                        <th style={{ padding: '10px' }}>B.Fiyat</th>
+                                        <th style={{ padding: '10px' }}>Açıklama</th>
+                                        <th style={{ padding: '10px' }}>Tutar</th>
+                                        <th style={{ padding: '10px' }}></th>
                                     </tr>
-                                )
-                            })}
-                            {yatirimIslemleri.length === 0 && <tr><td colSpan="7" style={{ padding: '20px', textAlign: 'center', color: '#aaa' }}>Henüz işlem yok.</td></tr>}
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    {(yatirimIslemleri || []).map(i => {
+                                        const hesap = (hesaplar || []).find(h => h.id === i.hesapId);
+                                        const hesapAdi = hesap ? hesap.hesapAdi : 'Silinmiş Hesap';
+                                        return (
+                                            <tr key={i.id} style={{ borderBottom: '1px solid #f7fafc' }}>
+                                                <td style={{ padding: '10px', color: '#718096' }}>{tarihFormatla(i.tarih)}</td>
+                                                <td style={{ padding: '10px' }}>{hesapAdi}</td>
+                                                <td style={{ padding: '10px' }}>{i.yatirimTuru || i.kategori || "Diğer"}</td>
+                                                <td style={{ padding: '10px' }}>{i.adet ? i.adet : '-'}</td>
+                                                <td style={{ padding: '10px' }}>{i.birimFiyat ? formatPara(i.birimFiyat) : '-'}</td>
+                                                <td style={{ padding: '10px' }}>{i.aciklama}</td>
+                                                <td style={{ padding: '10px', fontWeight: 'bold', color: i.islemTipi === 'yatirim_alis' ? 'red' : 'green' }}>{formatPara(i.tutar)}</td>
+                                                <td><span onClick={() => modalAc('duzenle_islem', i)} style={{ cursor: 'pointer' }}>✏️</span></td>
+                                                <td><span onClick={() => islemSil(i.id)} style={{ cursor: 'pointer' }}>🗑️</span></td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                    {/* ÖZET: YATIRIM NAKİT AKIŞI */}
+                    <div style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '2px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ color: '#718096', fontSize: '14px', fontWeight: 'bold' }}>
+                            Aylık Yatırım Nakit Akışı ({aktifYatirimAy})
+                        </div>
+                        {(() => {
+                            // STRICT CALCULATION RULE:
+                            // BUY (Alış) -> Positive (+) [Capital Injection]
+                            // SELL (Satış) -> Negative (-) [Capital Withdrawal]
+                            // Net Flow = Sum(Buy) - Sum(Sell)
+
+                            const totalBuy = (yatirimIslemleri || [])
+                                .filter(i => i.islemTipi === 'yatirim_alis')
+                                .reduce((acc, curr) => acc + parseFloat(curr.tutar || 0), 0);
+
+                            const totalSell = (yatirimIslemleri || [])
+                                .filter(i => i.islemTipi === 'yatirim_satis')
+                                .reduce((acc, curr) => acc + parseFloat(curr.tutar || 0), 0);
+
+                            const netFlow = totalBuy - totalSell;
+                            const isPositive = netFlow > 0;
+                            const isZero = Math.abs(netFlow) < 0.01;
+
+                            return (
+                                <div style={{
+                                    fontSize: '18px', // text-lg equivalent
+                                    fontWeight: 'bold',
+                                    color: isZero ? '#718096' : (isPositive ? '#38a169' : '#e53e3e')
+                                }}>
+                                    {isZero ? (
+                                        <span>₺0</span>
+                                    ) : (
+                                        <span>
+                                            {isPositive ? '+' : '-'}{formatPara(Math.abs(netFlow))}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </div>
                 </div>
 
             </div>
 
+            {/* PORTFOLIO ANALYSIS TABLE (ALL TIME) */}
+            <PortfolioAnalysisTable tumIslemler={tumIslemler} formatPara={formatPara} modalAc={modalAc} pozisyonSil={pozisyonSil} portfoy={portfoy} />
+
+
             <footer style={{ textAlign: 'center', marginTop: '30px', padding: '10px', color: '#a0aec0', fontSize: '12px' }}>
                 <p style={{ margin: 0, fontWeight: 'bold' }}>MUNDAN BİLİŞİM</p>
             </footer>
-        </div>
+        </div >
     );
 }
+
+// Safe rendering helper
+const safeVal = (val, suffix = "") => val ? val + suffix : "";
+
+const PortfolioAnalysisTable = ({ tumIslemler, formatPara, modalAc, pozisyonSil, portfoy }) => {
+    const [hoverIndex, setHoverIndex] = React.useState(-1); // For hover effect
+
+    // Create Price Map for Real-time valuations
+    const priceMap = React.useMemo(() => {
+        const map = {};
+        (portfoy || []).forEach(p => {
+            if (p.sembol && p.guncelFiyat) {
+                map[p.sembol.toUpperCase()] = p.guncelFiyat;
+            }
+        });
+        return map;
+    }, [portfoy]);
+
+    const analysisData = React.useMemo(() => {
+        if (!tumIslemler) return { rows: [], totalRealizedProfit: 0 };
+
+        // 1. Filter and Sort Chronologically (Oldest First) for FIFO
+        const allTransactions = (tumIslemler || []).filter(i =>
+            !i.analizdenGizle && ( // Filter out items hidden from analysis
+                i.kategori === 'Yatırım' ||
+                i.islemTipi === 'yatirim_alis' ||
+                i.islemTipi === 'yatirim_satis'
+            )
+        ).map(i => ({
+            ...i,
+            // USE ANALYSIS OVERRIDES IF PRESENT
+            adet: i.analiz_adet !== undefined ? i.analiz_adet : i.adet,
+            birimFiyat: i.analiz_birimFiyat !== undefined ? i.analiz_birimFiyat : i.birimFiyat,
+            tutar: i.analiz_tutar !== undefined ? i.analiz_tutar : i.tutar,
+            // Date override if needed? Usually date is less critical to override but let's allow it
+            tarih: i.analiz_tarih ? i.analiz_tarih : i.tarih
+        }))
+            .sort((a, b) => {
+                const dA = a.tarih?.seconds || 0;
+                const dB = b.tarih?.seconds || 0;
+                return dA - dB; // ASCENDING for FIFO processing
+            });
+
+        // 2. Group by Symbol
+        const transactionsBySymbol = {};
+        allTransactions.forEach(t => {
+            const rawSembol = (t.aciklama || "").replace(" Alış", "").replace(" Satış", "").trim().toUpperCase();
+            // Fallback to 'sembol' field if exists, or parse from description
+            const sembol = t.sembol || rawSembol;
+            if (!transactionsBySymbol[sembol]) transactionsBySymbol[sembol] = [];
+            transactionsBySymbol[sembol].push(t);
+        });
+
+        let totalRealizedProfit = 0;
+        const displayRows = [];
+
+        // 3. Process FIFO per Symbol
+        Object.keys(transactionsBySymbol).forEach(sembol => {
+            const transactions = transactionsBySymbol[sembol];
+            const buyQueue = []; // Holds open buy lots
+
+            transactions.forEach(t => {
+                const isSell = t.islemTipi === 'yatirim_satis';
+                const isBuy = t.islemTipi === 'yatirim_alis';
+                const qty = parseFloat(t.adet) || 0;
+                const price = parseFloat(t.birimFiyat) || 0;
+
+                if (isBuy) {
+                    buyQueue.push({
+                        id: t.id,
+                        sembol,
+                        tarihObj: t.tarih?.seconds,
+                        tarihStr: t.tarih?.seconds ? new Date(t.tarih.seconds * 1000).toLocaleDateString('tr-TR') : '-',
+                        alisFiyati: price,
+                        originalQty: qty,
+                        remainingQty: qty,
+                        originalTx: t
+                    });
+                } else if (isSell) {
+                    let qtyToSell = qty;
+                    while (qtyToSell > 0 && buyQueue.length > 0) {
+                        const currentLot = buyQueue[0];
+                        if (currentLot.remainingQty > qtyToSell) {
+                            const soldQty = qtyToSell;
+                            const closedChunk = {
+                                id: t.id + '_closed_' + currentLot.id,
+                                sembol,
+                                historyDateStr: t.tarih?.seconds ? new Date(t.tarih.seconds * 1000).toLocaleDateString('tr-TR') : '-', // Use SELL date in history? Or keep buy date?
+                                // Actually user might want to see when it was sold or bought. 
+                                // Standard is usually open date. 
+                                tarihStr: currentLot.tarihStr, // Keep open date
+                                type: 'Satış',
+                                adet: soldQty,
+                                alisFiyati: currentLot.alisFiyati,
+                                satisFiyati: price,
+                                kar: (price - currentLot.alisFiyati) * soldQty,
+                                margin: ((price / currentLot.alisFiyati) - 1) * 100,
+                                isClosed: true,
+                                buyContext: currentLot.originalTx,
+                                sellContext: t
+                            };
+                            totalRealizedProfit += closedChunk.kar;
+                            displayRows.push(closedChunk);
+                            currentLot.remainingQty -= soldQty;
+                            qtyToSell = 0;
+                        } else {
+                            const soldQty = currentLot.remainingQty;
+                            const closedChunk = {
+                                id: t.id + '_closed_' + currentLot.id,
+                                sembol,
+                                tarihStr: currentLot.tarihStr,
+                                type: 'Satış',
+                                adet: soldQty,
+                                alisFiyati: currentLot.alisFiyati,
+                                satisFiyati: price,
+                                kar: (price - currentLot.alisFiyati) * soldQty,
+                                margin: ((price / currentLot.alisFiyati) - 1) * 100,
+                                isClosed: true,
+                                buyContext: currentLot.originalTx,
+                                sellContext: t
+                            };
+                            totalRealizedProfit += closedChunk.kar;
+                            displayRows.push(closedChunk);
+                            qtyToSell -= soldQty;
+                            currentLot.remainingQty = 0;
+                            buyQueue.shift();
+                        }
+                    }
+                }
+            });
+
+            buyQueue.forEach(lot => {
+                if (lot.remainingQty > 0.0001) {
+                    // REAL-TIME P/L CALCULATION FOR OPEN POSITIONS
+                    const currentPrice = priceMap[sembol.toUpperCase()] || 0;
+                    const kar = currentPrice > 0 ? (currentPrice - lot.alisFiyati) * lot.remainingQty : 0;
+                    const margin = currentPrice > 0 ? ((currentPrice / lot.alisFiyati) - 1) * 100 : 0;
+
+                    displayRows.push({
+                        id: lot.id + '_open',
+                        sembol,
+                        tarihStr: lot.tarihStr,
+                        type: 'Alış',
+                        adet: lot.remainingQty,
+                        alisFiyati: lot.alisFiyati,
+                        satisFiyati: currentPrice, // SHOW CURRENT PRICE IF OPEN
+                        kar: kar, // POTENTIAL PROFIT
+                        margin: margin,
+                        isClosed: false,
+                        buyContext: lot.originalTx
+                    });
+                }
+            });
+        });
+
+        return { rows: displayRows.reverse(), totalRealizedProfit };
+
+    }, [tumIslemler, priceMap]);
+
+    return (
+        <div style={{ background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 10px 30px rgba(0,0,0,0.06)', border: '1px solid rgba(255,255,255,0.8)', marginTop: '30px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ margin: 0, color: '#2d3748' }}>📊 Portföy İşlem Analiz (Pozisyon Bazlı)</h3>
+                <div style={{ background: analysisData.totalRealizedProfit >= 0 ? '#f0fff4' : '#fff5f5', padding: '10px 20px', borderRadius: '10px', border: `1px solid ${analysisData.totalRealizedProfit >= 0 ? '#c6f6d5' : '#fed7d7'}` }}>
+                    <div style={{ fontSize: '12px', color: '#718096', fontWeight: 'bold' }}>TOPLAM REALİZE KAR</div>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: analysisData.totalRealizedProfit >= 0 ? 'green' : '#e53e3e' }}>
+                        {analysisData.totalRealizedProfit > 0 ? '+' : ''}{formatPara(analysisData.totalRealizedProfit)}
+                    </div>
+                </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', color: '#333' }}>
+                    <thead>
+                        <tr style={{ background: '#f7fafc', color: '#4a5568', textAlign: 'left' }}>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}>Hisse</th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}>Alış Tarihi</th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}>Adet</th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}>Alış Fiyatı</th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}>Satış Fiyatı</th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}>Kar (₺)</th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}>Marj (%)</th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}></th>
+                            <th style={{ padding: '12px', borderBottom: '2px solid #e2e8f0' }}></th> {/* Delete Col */}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {analysisData.rows.length === 0 ? (
+                            <tr><td colSpan="9" style={{ padding: '20px', textAlign: 'center', color: '#a0aec0' }}>Henüz açılmış bir pozisyon bulunmuyor.</td></tr>
+                        ) : (
+                            analysisData.rows.map((row, index) => {
+                                let rowBg = 'transparent';
+                                if (row.isClosed) {
+                                    rowBg = row.kar >= 0 ? '#f0fff4' : '#fff5f5';
+                                }
+
+                                const isHovered = hoverIndex === index;
+
+                                return (
+                                    <tr key={row.id + index} style={{ borderBottom: '1px solid #edf2f7', background: rowBg }}>
+                                        <td style={{ padding: '12px', fontWeight: 'bold' }}>{safeVal(row.sembol)}</td>
+                                        <td style={{ padding: '12px', color: '#718096' }}>{safeVal(row.tarihStr)}</td>
+                                        <td style={{ padding: '12px' }}>{Math.round(parseFloat(row.adet || 0))}</td>
+                                        <td style={{ padding: '12px' }}>{formatPara(row.alisFiyati)}</td>
+                                        <td style={{ padding: '12px' }}>{row.isClosed ? formatPara(row.satisFiyati) : '-'}</td>
+                                        <td style={{ padding: '12px', fontWeight: 'bold', color: row.isClosed ? (row.kar >= 0 ? 'green' : 'red') : '#a0aec0' }}>
+                                            {row.isClosed ? formatPara(row.kar) : '-'}
+                                        </td>
+                                        <td style={{ padding: '12px', fontWeight: 'bold', color: row.isClosed ? (row.margin >= 0 ? 'green' : 'red') : '#a0aec0' }}>
+                                            {row.isClosed ? `%${(row.margin || 0).toFixed(2)}` : '-'}
+                                        </td>
+                                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                                            <span
+                                                onClick={() => modalAc('duzenle_pozisyon', {
+                                                    sembol: row.sembol,
+                                                    isClosed: row.isClosed,
+                                                    buy: { ...row.buyContext, alisFiyati: row.alisFiyati, tarihStr: row.tarihStr, adet: row.adet },
+                                                    sell: row.isClosed ? { ...row.sellContext, satisFiyati: row.satisFiyati } : null,
+                                                    guncelFiyat: !row.isClosed ? row.satisFiyati : null // Pass current price for open pos
+                                                })}
+                                                onMouseEnter={() => setHoverIndex(index)}
+                                                onMouseLeave={() => setHoverIndex(-1)}
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    fontSize: '16px',
+                                                    display: 'inline-block',
+                                                    transform: isHovered ? 'scale(1.2)' : 'scale(1)',
+                                                    transition: 'transform 0.2s',
+                                                    filter: isHovered ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
+                                                }}
+                                                title="Pozisyonu Düzenle"
+                                            >
+                                                ✏️
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                                            <span
+                                                onClick={() => modalAc('pozisyon_sil_onay', { row })}
+                                                style={{ cursor: 'pointer', fontSize: '16px' }}
+                                                title="Pozisyonu Sil"
+                                            >
+                                                🗑️
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 export default InvestmentDashboard;

@@ -112,7 +112,7 @@ const BudgetDashboard = ({
                 <div style={{ ...cardStyle, gridColumn: 'span 2', minHeight: '300px' }}>
                     <h4 style={{ margin: '0 0 20px 0', color: '#2d3748' }}>📅 Günlük Harcama Trendi ({aktifAy})</h4>
                     <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={gunlukVeri}>
+                        <BarChart data={gunlukVeri || []}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                             <YAxis tick={{ fontSize: 12 }} />
@@ -129,7 +129,7 @@ const BudgetDashboard = ({
 
                 <div style={{ ...cardStyle, gridColumn: 'span 1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
 
-                    <ResponsiveContainer width="100%" height={250}><PieChart><Pie data={kategoriVerisi} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" label={({ name }) => name.substring(0, 10)}>{kategoriVerisi.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(value) => formatPara(value)} /></PieChart></ResponsiveContainer>
+                    <ResponsiveContainer width="100%" height={250}><PieChart><Pie data={kategoriVerisi || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" label={({ name }) => name.substring(0, 10)}>{(kategoriVerisi || []).map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(value) => formatPara(value)} /></PieChart></ResponsiveContainer>
                 </div>
             </div>
 
@@ -156,10 +156,15 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* MAAŞ MODÜLÜ */}
-                    <div style={cardStyle}>
-                        <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2d3748' }}>💰 Maaşlar & Gelirler</h4>
-                        <div style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '15px' }}>
-                            {maaslar.map(m => {
+                    <div style={{ ...cardStyle, height: 'fit-content' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>💰 Maaşlar & Gelirler</h4>
+                            <button onClick={() => modalAc('maas_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#48bb78', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                <span>+</span> Gelir Ekle
+                            </button>
+                        </div>
+                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                            {(maaslar || []).map(m => {
                                 const hesap = hesaplar.find(h => h.id === m.hesapId);
                                 return (
                                     <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #f0f0f0', fontSize: '14px' }}>
@@ -173,24 +178,19 @@ const BudgetDashboard = ({
                                 )
                             })}
                         </div>
-                        <form onSubmit={maasEkle} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <input placeholder="Gelir Adı (Maaş vb.)" value={maasAd} onChange={e => setMaasAd(e.target.value)} style={{ ...inputStyle, flex: 2 }} />
-                                <input placeholder="Tutar" type="number" value={maasTutar} onChange={e => setMaasTutar(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                            </div>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <input placeholder="Gün" type="number" value={maasGun} onChange={e => setMaasGun(e.target.value)} style={{ ...inputStyle, width: '70px', flex: 'none', textAlign: 'center' }} />
-                                <select value={maasHesapId} onChange={e => setMaasHesapId(e.target.value)} style={{ ...inputStyle, flex: 1 }}><option value="">Hesap Seç</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi}</option>)}</select>
-                                <button type="submit" style={{ background: '#48bb78', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '0 15px', fontWeight: 'bold' }}>+</button>
-                            </div>
-                        </form>
+                        {maaslar.length === 0 && <div style={{ fontSize: '12px', color: '#aaa', padding: '10px', textAlign: 'center' }}>Düzenli gelir eklemek için + butonuna basın.</div>}
                     </div>
 
                     {/* HESAPLAR */}
-                    <div style={cardStyle}>
-                        <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2d3748' }}>💳 Cüzdanlar & Kartlar</h4>
+                    <div style={{ ...cardStyle, height: 'fit-content' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>💳 Cüzdanlar & Kartlar</h4>
+                            <button onClick={() => modalAc('hesap_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#3182ce', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                <span>+</span> Hesap Ekle
+                            </button>
+                        </div>
                         <div style={{ marginBottom: '15px' }}>
-                            {hesaplar.map(h => {
+                            {(hesaplar || []).map(h => {
                                 let toplamBakiye = parseFloat(h.guncelBakiye) || 0;
                                 let aylikFark = 0;
                                 filtrelenmisIslemler.forEach(i => {
@@ -214,7 +214,7 @@ const BudgetDashboard = ({
                                         </div>
                                         <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                                             <span style={{ color: toplamBakiye < 0 ? 'red' : 'green', fontWeight: '600', fontSize: '15px' }}>{formatPara(toplamBakiye)}</span>
-                                            {h.hesapTipi === 'krediKarti' && <button onClick={() => modalAc('kredi_karti_ode', h)} style={{ background: '#805ad5', color: 'white', border: 'none', padding: '3px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', marginLeft: '5px' }}>Borç Öde</button>}
+                                            {h.hesapTipi === 'krediKarti' && toplamBakiye < 0 && <button onClick={() => modalAc('kredi_karti_ode', h)} style={{ background: '#805ad5', color: 'white', border: 'none', padding: '3px 8px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', marginLeft: '5px' }}>Borç Öde</button>}
                                             <span onClick={() => normalSil("hesaplar", h.id)} style={{ cursor: 'pointer', color: 'red', fontSize: '12px' }}>🗑️</span>
                                         </div>
                                     </div>
@@ -226,12 +226,6 @@ const BudgetDashboard = ({
                             <div style={{ color: '#666' }}>+ Portföy/Yatırım/BES: <b>{formatPara(genelToplamYatirimGucu)}</b></div>
                             <div style={{ color: '#2d3748', fontSize: '16px', marginTop: '5px' }}>NET VARLIK: <b style={{ color: netVarlik >= 0 ? 'green' : 'red' }}>{formatPara(netVarlik)}</b></div>
                         </div>
-                        <form onSubmit={hesapEkle} style={{ display: 'flex', gap: '8px', marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                            <input placeholder="Ad" value={hesapAdi} onChange={e => setHesapAdi(e.target.value)} style={{ flex: 2, ...inputStyle }} />
-                            <select value={hesapTipi} onChange={e => setHesapTipi(e.target.value)} style={{ flex: 1, ...inputStyle }}><option value="nakit">Nakit</option><option value="krediKarti">Kart</option><option value="yatirim">Yatırım H.</option></select>
-                            <input placeholder="Bakiye" type="number" value={baslangicBakiye} onChange={e => setBaslangicBakiye(e.target.value)} style={{ flex: 1, ...inputStyle }} />
-                            <button type="submit" style={{ background: '#3182ce', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '0 15px', fontWeight: 'bold' }}>+</button>
-                        </form>
                     </div>
 
                     {/* TAKSİTLER */}
@@ -239,7 +233,7 @@ const BudgetDashboard = ({
                         <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2d3748' }}>📦 Taksitli Alışverişler</h4>
                         {taksitler.length === 0 ? <p style={{ fontSize: '13px', color: '#aaa' }}>Aktif taksit borcu yok.</p> :
                             <div style={{ marginBottom: '15px' }}>
-                                {taksitler.map(t => {
+                                {(taksitler || []).map(t => {
                                     const yuzde = (t.odenmisTaksit / t.taksitSayisi) * 100;
                                     return (
                                         <div key={t.id} style={{ padding: '10px', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
@@ -268,11 +262,16 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* FATURALAR (YENİ MODÜL) */}
-                    <div style={cardStyle}>
-                        <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2d3748' }}>🧾 Faturalar & Abonelikler</h4>
-                        <div style={{ maxHeight: '250px', overflowY: 'auto', marginBottom: '15px' }}>
+                    <div style={{ ...cardStyle, height: 'fit-content' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>🧾 Faturalar & Abonelikler</h4>
+                            <button onClick={() => modalAc('fatura_tanim_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#4a5568', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                <span>+</span> Fatura Tanımla
+                            </button>
+                        </div>
+                        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
                             {/* Faturalar */}
-                            {tanimliFaturalar.map(tanim => {
+                            {(tanimliFaturalar || []).map(tanim => {
                                 const bekleyen = bekleyenFaturalar.find(f => f.tanimId === tanim.id);
                                 return (
                                     <div key={tanim.id} style={{ marginBottom: '10px', border: '1px solid #eee', borderRadius: '10px', overflow: 'hidden' }}>
@@ -301,22 +300,18 @@ const BudgetDashboard = ({
                                 )
                             })}
                         </div>
-                        <form onSubmit={faturaTanimEkle} style={{ borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                            <p style={{ fontSize: '11px', color: '#718096', marginBottom: '5px' }}>Yeni Fatura Tanımı Ekle:</p>
-                            <input placeholder="Başlık (Ev İnternet)" value={tanimBaslik} onChange={e => setTanimBaslik(e.target.value)} style={{ ...inputStyle, padding: '8px', marginBottom: '5px' }} required />
-                            <div style={{ display: 'flex', gap: '5px' }}>
-                                <input placeholder="Kurum" value={tanimKurum} onChange={e => setTanimKurum(e.target.value)} style={{ ...inputStyle, padding: '8px' }} />
-                                <input placeholder="Abone No" value={tanimAboneNo} onChange={e => setTanimAboneNo(e.target.value)} style={{ ...inputStyle, padding: '8px' }} />
-                            </div>
-                            <button type="submit" style={{ width: '100%', marginTop: '5px', background: '#4a5568', color: 'white', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer' }}>Tanımla</button>
-                        </form>
                     </div>
 
                     {/* ABONELİKLER */}
-                    <div style={cardStyle}>
-                        <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2d3748' }}>🔄 Sabit Giderler</h4>
+                    <div style={{ ...cardStyle, height: 'fit-content' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>🔄 Sabit Giderler</h4>
+                            <button onClick={() => modalAc('abonelik_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#805ad5', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                <span>+</span> Gider Ekle
+                            </button>
+                        </div>
                         <div style={{ marginBottom: '15px' }}>
-                            {abonelikler.map(abo => {
+                            {(abonelikler || []).map(abo => {
                                 const hesap = hesaplar.find(h => h.id === abo.hesapId);
                                 return (
                                     <div key={abo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #f0f0f0', fontSize: '14px' }}>
@@ -334,14 +329,6 @@ const BudgetDashboard = ({
                         <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee', textAlign: 'right', fontSize: '13px' }}>
                             <span style={{ color: '#718096' }}>Aylık Sabit Gider: <b style={{ color: '#e53e3e' }}>{formatPara(toplamSabitGider)}</b></span>
                         </div>
-                        <form onSubmit={abonelikEkle} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', borderTop: '1px solid #eee', paddingTop: '15px', marginTop: '15px' }}>
-                            <input placeholder="Ad" value={aboAd} onChange={e => setAboAd(e.target.value)} style={{ ...inputStyle }} />
-                            <input placeholder="Tutar" type="number" value={aboTutar} onChange={e => setAboTutar(e.target.value)} style={{ ...inputStyle }} />
-                            <input placeholder="Gün" type="number" value={aboGun} onChange={e => setAboGun(e.target.value)} style={{ ...inputStyle }} />
-                            <select value={aboKategori} onChange={e => setAboKategori(e.target.value)} style={{ gridColumn: 'span 3', ...inputStyle }}>{kategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}</select>
-                            <select value={aboHesapId} onChange={e => setAboHesapId(e.target.value)} style={{ gridColumn: 'span 3', ...inputStyle }}><option value="">Hangi Hesaptan?</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi}</option>)}</select>
-                            <button type="submit" style={{ gridColumn: 'span 3', background: '#805ad5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '10px', fontWeight: 'bold' }}>EKLE</button>
-                        </form>
                     </div>
                 </div>
 
@@ -362,11 +349,11 @@ const BudgetDashboard = ({
                         {formTab === "islem" && (
                             <form onSubmit={islemEkle} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <select value={secilenHesapId} onChange={e => setSecilenHesapId(e.target.value)} style={{ flex: 1, ...inputStyle, backgroundColor: '#f7fafc' }}><option value="">Hangi Hesaptan?</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select>
+                                    <select value={secilenHesapId} onChange={e => setSecilenHesapId(e.target.value)} style={{ flex: 1, ...inputStyle, backgroundColor: '#f7fafc' }}><option value="">Hangi Hesaptan?</option>{(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select>
                                     <select value={islemTipi} onChange={e => setIslemTipi(e.target.value)} style={{ flex: 1, ...inputStyle }}><option value="gider">🔴 Gider</option><option value="gelir">🟢 Gelir</option></select>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <select value={kategori || kategoriListesi[0]} onChange={e => setKategori(e.target.value)} style={{ flex: 1, ...inputStyle }}>{kategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}</select>
+                                    <select value={kategori || (kategoriListesi && kategoriListesi[0])} onChange={e => setKategori(e.target.value)} style={{ flex: 1, ...inputStyle }}>{(kategoriListesi || []).map(k => <option key={k} value={k}>{k}</option>)}</select>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px' }}>
                                     <input placeholder="Açıklama" value={islemAciklama} onChange={e => setIslemAciklama(e.target.value)} style={{ flex: 1, ...inputStyle }} />
@@ -379,8 +366,8 @@ const BudgetDashboard = ({
 
                         {formTab === "transfer" && (
                             <form onSubmit={transferYap} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', background: '#ebf8ff', padding: '20px', borderRadius: '10px' }}>
-                                <div><label style={{ fontSize: '12px', color: '#2b6cb0' }}>Nereden?</label><select value={transferKaynakId} onChange={e => setTransferKaynakId(e.target.value)} style={{ ...inputStyle }}><option value="">Seçiniz...</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select></div>
-                                <div><label style={{ fontSize: '12px', color: '#2b6cb0' }}>Nereye?</label><select value={transferHedefId} onChange={e => setTransferHedefId(e.target.value)} style={{ ...inputStyle }}><option value="">Seçiniz...</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select></div>
+                                <div><label style={{ fontSize: '12px', color: '#2b6cb0' }}>Nereden?</label><select value={transferKaynakId} onChange={e => setTransferKaynakId(e.target.value)} style={{ ...inputStyle }}><option value="">Seçiniz...</option>{(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select></div>
+                                <div><label style={{ fontSize: '12px', color: '#2b6cb0' }}>Nereye?</label><select value={transferHedefId} onChange={e => setTransferHedefId(e.target.value)} style={{ ...inputStyle }}><option value="">Seçiniz...</option>{(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select></div>
                                 <input type="number" placeholder="Tutar (₺)" value={transferTutar} onChange={e => setTransferTutar(e.target.value)} style={{ gridColumn: 'span 2', ...inputStyle }} />
                                 <input type="datetime-local" value={transferTarihi} onChange={e => setTransferTarihi(e.target.value)} style={{ gridColumn: 'span 2', ...inputStyle }} />
                                 <button type="submit" style={{ gridColumn: 'span 2', padding: '15px', background: '#3182ce', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>TRANSFER YAP / BORÇ ÖDE</button>
@@ -391,10 +378,10 @@ const BudgetDashboard = ({
                             <form onSubmit={taksitEkle} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', background: '#f3e8ff', padding: '20px', borderRadius: '10px' }}>
                                 <div style={{ gridColumn: 'span 2' }}><h4 style={{ margin: '0 0 10px 0', color: '#6b46c1' }}>📦 Yeni Taksit Planı Oluştur</h4></div>
                                 <input placeholder="Ne aldın?" value={taksitBaslik} onChange={e => setTaksitBaslik(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }} required />
-                                <select value={taksitHesapId} onChange={e => setTaksitHesapId(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }} required><option value="">Hangi Karttan?</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi}</option>)}</select>
+                                <select value={taksitHesapId} onChange={e => setTaksitHesapId(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }} required><option value="">Hangi Karttan?</option>{(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi}</option>)}</select>
                                 <input type="number" placeholder="Toplam Borç (₺)" value={taksitToplamTutar} onChange={e => setTaksitToplamTutar(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }} required />
                                 <input type="number" placeholder="Kaç Taksit?" value={taksitSayisi} onChange={e => setTaksitSayisi(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }} required />
-                                <select value={taksitKategori || kategoriListesi[0]} onChange={e => setTaksitKategori(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }}>{kategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}</select>
+                                <select value={taksitKategori || (kategoriListesi && kategoriListesi[0])} onChange={e => setTaksitKategori(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }}>{(kategoriListesi || []).map(k => <option key={k} value={k}>{k}</option>)}</select>
                                 <div style={{ gridColumn: 'span 2' }}><label style={{ fontSize: '12px', color: '#6b46c1' }}>Alış Tarihi</label><input type="date" value={taksitAlisTarihi} onChange={e => setTaksitAlisTarihi(e.target.value)} style={{ ...inputStyle, border: '1px solid #d6bcfa' }} /></div>
                                 <div style={{ gridColumn: 'span 2', fontSize: '14px', color: '#553c9a', fontWeight: 'bold', padding: '10px', background: 'white', borderRadius: '8px' }}>ℹ️ Aylık: {taksitToplamTutar && taksitSayisi ? formatPara(taksitToplamTutar / taksitSayisi) : '0,00 ₺'}</div>
                                 <button type="submit" style={{ gridColumn: 'span 2', padding: '15px', background: '#805ad5', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>KAYDET</button>
@@ -413,7 +400,7 @@ const BudgetDashboard = ({
                                         <div style={{ gridColumn: 'span 2' }}>
                                             <select value={secilenTanimId} onChange={e => setSecilenTanimId(e.target.value)} style={{ ...inputStyle, border: '1px solid #feb2b2' }} required>
                                                 <option value="">Hangi Fatura?</option>
-                                                {tanimliFaturalar.map(t => <option key={t.id} value={t.id}>{t.baslik} ({t.kurum})</option>)}
+                                                {(tanimliFaturalar || []).map(t => <option key={t.id} value={t.id}>{t.baslik} ({t.kurum})</option>)}
                                             </select>
                                         </div>
                                         <input type="number" placeholder="Tutar (₺)" value={faturaGirisTutar} onChange={e => setFaturaGirisTutar(e.target.value)} style={{ ...inputStyle, border: '1px solid #feb2b2' }} required />
@@ -431,7 +418,7 @@ const BudgetDashboard = ({
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '5px' }}>
                             <h4 style={{ marginTop: 0, color: '#2c3e50', margin: 0 }}>📜 Harcama Geçmişi</h4>
                             <div className="no-scrollbar" style={{ display: 'flex', gap: '5px', alignItems: 'center', overflowX: 'auto', whiteSpace: 'nowrap', maxWidth: '300px' }}>
-                                {mevcutAylar.map(ay => (
+                                {(mevcutAylar || []).map(ay => (
                                     <button key={ay} onClick={() => setAktifAy(ay)} style={{ flexShrink: 0, padding: '5px 10px', fontSize: '12px', borderRadius: '15px', border: 'none', cursor: 'pointer', background: aktifAy === ay ? '#2c3e50' : '#edf2f7', color: aktifAy === ay ? 'white' : '#4a5568', fontWeight: 'bold' }}>{ay}</button>
                                 ))}
                             </div>
@@ -444,7 +431,7 @@ const BudgetDashboard = ({
                                 <input type="text" placeholder="Harcama, market, tutar ara..." value={aramaMetni} onChange={(e) => setAramaMetni(e.target.value)} style={{ border: 'none', outline: 'none', padding: '10px', width: '100%', fontSize: '13px', background: 'transparent', color: '#333' }} />
                                 {aramaMetni && <span onClick={() => setAramaMetni("")} style={{ cursor: 'pointer', color: '#aaa', fontWeight: 'bold' }}>X</span>}
                             </div>
-                            <select value={filtreKategori} onChange={e => setFiltreKategori(e.target.value)} style={{ flex: 1, minWidth: '120px', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', cursor: 'pointer', fontSize: '13px', backgroundColor: '#ffffff', color: '#333' }}><option value="Tümü">Tüm Kategoriler</option>{kategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}<option value="Transfer">Transfer</option></select>
+                            <select value={filtreKategori} onChange={e => setFiltreKategori(e.target.value)} style={{ flex: 1, minWidth: '120px', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', cursor: 'pointer', fontSize: '13px', backgroundColor: '#ffffff', color: '#333' }}><option value="Tümü">Tüm Kategoriler</option>{(kategoriListesi || []).map(k => <option key={k} value={k}>{k}</option>)}<option value="Transfer">Transfer</option></select>
                             <div style={{ display: 'flex', gap: '5px' }}>
                                 <button onClick={excelIndir} style={{ background: '#276749', color: 'white', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>📥 XLS</button>
                                 <label style={{ background: '#2b6cb0', color: 'white', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>📤 Yükle <input type="file" accept=".xlsx,.xls,.csv" onChange={excelYukle} style={{ display: 'none' }} /></label>
@@ -455,7 +442,7 @@ const BudgetDashboard = ({
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '15px', color: '#333', minWidth: '500px' }}>
                                 <thead><tr style={{ textAlign: 'left', color: '#718096', borderBottom: '2px solid #e2e8f0' }}><th style={{ padding: '10px' }}>Tarih</th><th style={{ padding: '10px' }}>Hesap</th><th style={{ padding: '10px' }}>Kategori</th><th style={{ padding: '10px' }}>Açıklama</th><th style={{ padding: '10px' }}>Tutar</th><th></th><th></th></tr></thead>
                                 <tbody>
-                                    {filtrelenmisIslemler.map(i => {
+                                    {(filtrelenmisIslemler || []).map(i => {
                                         const hesap = hesaplar.find(h => h.id === i.hesapId);
                                         let hesapAdi = hesap?.hesapAdi || "Bilinmeyen";
                                         let renk = 'black';

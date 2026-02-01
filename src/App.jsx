@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { db } from './firebase'
 import { doc, setDoc } from 'firebase/firestore'
 import { ToastContainer } from 'react-toastify';
@@ -42,6 +42,32 @@ function App() {
     const calculations = useCalculations(data, gizliMod, data.aylikLimit);
     const budgetActions = useBudgetActions(user, alanKodu, data.hesaplar, data.kategoriListesi, data.tanimliFaturalar);
     const investmentActions = useInvestmentActions(user, alanKodu);
+
+    // 3.1 GÜVENLİK VE UX İYİLEŞTİRMELERİ (Global Date Fix)
+    useEffect(() => {
+        const handleFocus = (e) => {
+            if (e.target && (e.target.type === 'date' || e.target.type === 'datetime-local')) {
+                // 1. 4 Haneli Yıl Sınırlaması (Max 9999)
+                const isDateTime = e.target.type === 'datetime-local';
+                const maxVal = isDateTime ? "9999-12-31T23:59" : "9999-12-31";
+                if (!e.target.hasAttribute('max')) {
+                    e.target.setAttribute('max', maxVal);
+                }
+            }
+        };
+
+        // Capture phase to catch all focus events
+        window.addEventListener('focus', handleFocus, true);
+        return () => window.removeEventListener('focus', handleFocus, true);
+    }, []);
+
+    // 3.2 URL TEMİZLİK (Soru işaretini kaldır)
+    useEffect(() => {
+        if (window.location.search) {
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    }, []);
 
     // 4. HELPER FUNCTIONS (View-Specific Logic)
     const cikisYap = async () => {
@@ -147,6 +173,9 @@ function App() {
                 islemAciklama={budgetActions.islemAciklama} setIslemAciklama={budgetActions.setIslemAciklama}
                 islemTutar={budgetActions.islemTutar} setIslemTutar={budgetActions.setIslemTutar}
                 islemTarihi={budgetActions.islemTarihi} setIslemTarihi={budgetActions.setIslemTarihi}
+                // NEW: Quantity & Unit Price Props
+                islemAdet={budgetActions.islemAdet} setIslemAdet={budgetActions.setIslemAdet}
+                islemBirimFiyat={budgetActions.islemBirimFiyat} setIslemBirimFiyat={budgetActions.setIslemBirimFiyat}
                 kategori={budgetActions.kategori} setKategori={budgetActions.setKategori}
                 yatirimTurleri={data.yatirimTurleri}
                 kategoriListesi={data.kategoriListesi}
@@ -202,7 +231,14 @@ function App() {
                 varlikTuru={investmentActions.varlikTuru} setVarlikTuru={investmentActions.setVarlikTuru}
                 tahsilatTutar={investmentActions.tahsilatTutar} setTahsilatTutar={investmentActions.setTahsilatTutar}
                 satisTahsilatEkle={investmentActions.satisTahsilatEkle}
+                pozisyonGuncelle={investmentActions.pozisyonGuncelle} // NEW PROP assigned
+                pozisyonSil={investmentActions.pozisyonSil} // NEW PROP assigned
                 onConfirmLogout={handleConfirmLogout}
+                // FIXED: Passing missing action props
+                maasEkle={budgetActions.maasEkle}
+                hesapEkle={budgetActions.hesapEkle}
+                faturaTanimEkle={budgetActions.faturaTanimEkle}
+                abonelikEkle={budgetActions.abonelikEkle}
             />
 
             <Header
@@ -280,6 +316,8 @@ function App() {
                     hesapTipi={budgetActions.hesapTipi} setHesapTipi={budgetActions.setHesapTipi}
                     baslangicBakiye={budgetActions.baslangicBakiye} setBaslangicBakiye={budgetActions.setBaslangicBakiye}
 
+                    pozisyonGuncelle={investmentActions.pozisyonGuncelle} // NEW: Pass to Modal Manager
+
                     faturaTanimEkle={budgetActions.faturaTanimEkle}
                     tanimBaslik={budgetActions.tanimBaslik} setTanimBaslik={budgetActions.setTanimBaslik}
                     tanimKurum={budgetActions.tanimKurum} setTanimKurum={budgetActions.setTanimKurum}
@@ -354,6 +392,7 @@ function App() {
                     yatirimTurleri={data.yatirimTurleri}
                     hesaplar={data.hesaplar}
                     yatirimIslemleri={calculations.yatirimIslemleri}
+                    tumIslemler={data.islemler} // NEW: Pass all transactions for All-Time Analysis
                     yatirimArama={calculations.yatirimArama} setYatirimArama={calculations.setYatirimArama}
                     aktifYatirimAy={calculations.aktifYatirimAy} setAktifYatirimAy={calculations.setAktifYatirimAy}
                     filtreYatirimTuru={calculations.filtreYatirimTuru} setFiltreYatirimTuru={calculations.setFiltreYatirimTuru}
@@ -361,7 +400,7 @@ function App() {
                     islemSil={budgetActions.islemSil}
                     portfoySil={investmentActions.portfoySil}
                     fiyatGuncelle={investmentActions.fiyatGuncelle}
-
+                    pozisyonSil={investmentActions.pozisyonSil} // NEW PROP assigned
                     // BES Module Props
                     besVerisi={data.besVerisi}
                     toplamBesYatirimi={calculations.toplamBesYatirimi}

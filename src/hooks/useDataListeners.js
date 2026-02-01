@@ -48,18 +48,34 @@ export const useDataListeners = (user, alanKodu) => {
         // TEK REFERANS: Kullanıcının kendi ayar dokümanı (hem limitler hem BES verisi burada)
         const ayarlarDocRef = doc(db, "ayarlar", alanKodu);
 
-        const u1 = onSnapshot(qHesaplar, (s) => setHesaplar(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const u2 = onSnapshot(qIslemler, (s) => {
-            const v = s.docs.map(d => ({ id: d.id, ...d.data() }));
-            v.sort((a, b) => (b.tarih?.seconds || 0) - (a.tarih?.seconds || 0));
-            setIslemler(v);
+        const u1 = onSnapshot(qHesaplar, (s) => {
+            if (s && s.docs) setHesaplar(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        const u4 = onSnapshot(qAbonelik, (s) => setAbonelikler(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const u5 = onSnapshot(qTaksitler, (s) => setTaksitler(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const u6 = onSnapshot(qMaaslar, (s) => setMaaslar(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const u7 = onSnapshot(qPortfoy, (s) => setPortfoy(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const u8 = onSnapshot(qFaturalar, (s) => setBekleyenFaturalar(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-        const u9 = onSnapshot(qFaturaTanim, (s) => setTanimliFaturalar(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const u2 = onSnapshot(qIslemler, (s) => {
+            if (s && s.docs) {
+                const v = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                v.sort((a, b) => (b.tarih?.seconds || 0) - (a.tarih?.seconds || 0));
+                setIslemler(v);
+            }
+        });
+        const u4 = onSnapshot(qAbonelik, (s) => {
+            if (s && s.docs) setAbonelikler(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const u5 = onSnapshot(qTaksitler, (s) => {
+            if (s && s.docs) setTaksitler(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const u6 = onSnapshot(qMaaslar, (s) => {
+            if (s && s.docs) setMaaslar(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const u7 = onSnapshot(qPortfoy, (s) => {
+            if (s && s.docs) setPortfoy(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const u8 = onSnapshot(qFaturalar, (s) => {
+            if (s && s.docs) setBekleyenFaturalar(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const u9 = onSnapshot(qFaturaTanim, (s) => {
+            if (s && s.docs) setTanimliFaturalar(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
 
         // Consolidated Listener for Settings (Limit, Categories, BES Data all in one doc)
         const u10 = onSnapshot(ayarlarDocRef, (docSnap) => {

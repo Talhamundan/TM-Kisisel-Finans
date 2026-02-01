@@ -16,6 +16,7 @@ const GoalsInventory = ({
 
     // --- STATE FOR MODALS ---
     const [modalState, setModalState] = useState({ type: null, data: null });
+    const [isProcessing, setIsProcessing] = useState(false); // Prop for disabling buttons
 
     // Form States (Local)
     const [formUrunAdi, setFormUrunAdi] = useState("");
@@ -42,20 +43,20 @@ const GoalsInventory = ({
     const [inlineLink, setInlineLink] = useState("");
 
     // --- CALCULATIONS ---
-    const toplamAlacaklar = satislar.reduce((acc, s) => {
+    const toplamAlacaklar = (satislar || []).reduce((acc, s) => {
         const kalan = (parseFloat(s.satisFiyati) - parseFloat(s.tahsilEdilen));
         return acc + (kalan > 0 ? kalan : 0);
     }, 0);
 
-    const toplamEnvanterDegeri = envanter.reduce((acc, e) => acc + (parseFloat(e.deger) || 0), 0);
-    const toplamTicariKar = satislar.reduce((acc, s) => {
+    const toplamEnvanterDegeri = (envanter || []).reduce((acc, e) => acc + (parseFloat(e.deger) || 0), 0);
+    const toplamTicariKar = (satislar || []).reduce((acc, s) => {
         const kar = parseFloat(s.satisFiyati) - (parseFloat(s.alisMaliyeti) || 0);
         return acc + kar;
     }, 0);
 
-    const toplamTahsilat = satislar.reduce((acc, s) => acc + (parseFloat(s.tahsilEdilen) || 0), 0);
-    const toplamEnvanterOdeme = envanter.reduce((acc, e) => acc + (e.odenenTutar !== undefined ? parseFloat(e.odenenTutar) : parseFloat(e.deger || 0)), 0);
-    const toplamSatisOdeme = satislar.reduce((acc, s) => acc + (s.odenenTutar !== undefined ? parseFloat(s.odenenTutar) : parseFloat(s.alisMaliyeti || 0)), 0);
+    const toplamTahsilat = (satislar || []).reduce((acc, s) => acc + (parseFloat(s.tahsilEdilen) || 0), 0);
+    const toplamEnvanterOdeme = (envanter || []).reduce((acc, e) => acc + (e.odenenTutar !== undefined ? parseFloat(e.odenenTutar) : parseFloat(e.deger || 0)), 0);
+    const toplamSatisOdeme = (satislar || []).reduce((acc, s) => acc + (s.odenenTutar !== undefined ? parseFloat(s.odenenTutar) : parseFloat(s.alisMaliyeti || 0)), 0);
     const ticariKasa = toplamTahsilat - (toplamEnvanterOdeme + toplamSatisOdeme);
 
     // --- OPEN MODAL HANDLERS ---
@@ -133,8 +134,15 @@ const GoalsInventory = ({
         setModalState({ type: 'hedef_para_ekle', data: hedef });
     };
 
+    const openHedefSilOnay = (hedef) => {
+        setModalState({ type: 'hedef_sil_onay', data: hedef });
+    };
+
     // --- CLOSE MODAL ---
-    const close = () => setModalState({ type: null, data: null });
+    const close = () => {
+        setModalState({ type: null, data: null });
+        setIsProcessing(false);
+    };
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '40fr 60fr', gap: '25px', marginBottom: '30px' }}>
@@ -168,52 +176,76 @@ const GoalsInventory = ({
 
                 {/* HEDEFLERİM KARTI (Inline Form Style) */}
                 <div style={cardStyle}>
-                    <h4 style={{ margin: '0 0 15px 0', color: '#2d3748', borderBottom: '1px solid #edf2f7', paddingBottom: '10px' }}>🎯 Hedeflerim</h4>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '300px', overflowY: 'auto' }}>
-                        {hedefler.map(h => {
-                            const yuzde = Math.min(100, (h.biriken / h.hedefTutar) * 100);
-                            const tamamlandi = h.biriken >= h.hedefTutar;
-                            return (
-                                <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #f0f0f0', fontSize: '14px' }}>
-                                    <div style={{ flex: 1, marginRight: '15px' }}>
-                                        <div style={{ fontWeight: 'bold', color: '#2d3748' }}>{h.hedefAdi}</div>
-                                        <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                                            <span style={{ color: tamamlandi ? '#48bb78' : '#805ad5', fontWeight: 'bold' }}>{formatPara(h.biriken)}</span> / {formatPara(h.hedefTutar)}
-                                        </div>
-                                        <div style={{ height: '4px', width: '100%', background: '#edf2f7', borderRadius: '2px', marginTop: '6px', overflow: 'hidden' }}>
-                                            <div style={{ height: '100%', width: `${yuzde}%`, background: tamamlandi ? '#48bb78' : '#805ad5', borderRadius: '2px', transition: 'width 0.5s' }}></div>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        {h.urunLinki && (
-                                            <a href={h.urunLinki} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: '12px' }} title="Ürüne Git">🔗</a>
-                                        )}
-                                        {!tamamlandi ? (
-                                            <button onClick={() => openHedefParaEkle(h)} style={{ background: '#e6fffa', color: '#38b2ac', fontWeight: 'bold', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '5px', fontSize: '11px' }}>+ Ekle</button>
-                                        ) : (
-                                            <button onClick={() => actions.hedefSatinAl(h)} style={{ background: '#c6f6d5', color: '#22543d', fontWeight: 'bold', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '5px', fontSize: '11px' }}>AL</button>
-                                        )}
-                                        <span onClick={() => openHedefDuzenle(h)} style={{ cursor: 'pointer', fontSize: '12px', opacity: 0.6 }}>✏️</span>
-                                        <span onClick={() => { if (window.confirm('Silmek istediğine emin misin?')) actions.hedefSil(h.id); }} style={{ cursor: 'pointer', fontSize: '12px', opacity: 0.6 }}>🗑️</span>
-                                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #edf2f7', paddingBottom: '10px' }}>
+                        <h4 style={{ margin: 0, color: '#2d3748' }}>🎯 Hedeflerim</h4>
+                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                            <button onClick={openHedefEkle} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#805ad5', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                <span>+</span> Hedef Ekle
+                            </button>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '11px', color: '#718096', fontWeight: 'bold' }}>TOPLAM GEREKEN</div>
+                                <div style={{ fontSize: '15px', color: '#805ad5', fontWeight: 'bold' }}>
+                                    {formatPara((hedefler || []).reduce((acc, h) => acc + (parseFloat(h.hedefTutar) || 0), 0))}
                                 </div>
-                            )
-                        })}
-                        {hedefler.length === 0 && <div style={{ textAlign: 'center', color: '#a0aec0', fontSize: '12px', padding: '15px' }}>Henüz hedef yok.</div>}
+                            </div>
+                        </div>
                     </div>
 
-                    <form onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!inlineHedefAd || !inlineHedefTutar) return alert("Ad ve Tutar zorunlu");
-                        actions.hedefEkle({ hedefAdi: inlineHedefAd, hedefTutar: parseFloat(inlineHedefTutar), biriken: 0, urunLinki: inlineLink });
-                        setInlineHedefAd(""); setInlineHedefTutar(""); setInlineLink("");
-                    }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', borderTop: '1px solid #eee', paddingTop: '15px', marginTop: '5px' }}>
-                        <input placeholder="Hedef Adı" value={inlineHedefAd} onChange={e => setInlineHedefAd(e.target.value)} style={{ gridColumn: 'span 2', ...inputStyle }} required />
-                        <input type="number" placeholder="Tutar (₺)" value={inlineHedefTutar} onChange={e => setInlineHedefTutar(e.target.value)} style={{ ...inputStyle }} required />
-                        <input placeholder="Link (Opsiyonel)" value={inlineLink} onChange={e => setInlineLink(e.target.value)} style={{ ...inputStyle }} />
-                        <button type="submit" style={{ gridColumn: 'span 2', background: '#805ad5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: '10px', fontWeight: 'bold', marginTop: '5px' }}>HEDEF EKLE</button>
-                    </form>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        {[...(hedefler || [])]
+                            .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
+                            .map((h, index, array) => {
+                                const yuzde = Math.min(100, (h.biriken / h.hedefTutar) * 100);
+                                const tamamlandi = h.biriken >= h.hedefTutar;
+
+                                const move = async (dir) => {
+                                    const currentIndex = h.orderIndex || 0;
+                                    const targetIndex = currentIndex + dir;
+                                    const currentPos = index;
+                                    const targetPos = index + dir;
+
+                                    if (targetPos < 0 || targetPos >= array.length) return; // Out of bounds
+
+                                    const targetItem = array[targetPos];
+                                    const newOrderA = targetItem.orderIndex !== undefined ? targetItem.orderIndex : targetPos;
+                                    const newOrderB = h.orderIndex !== undefined ? h.orderIndex : currentPos;
+
+                                    await actions.hedefDuzenle(h.id, { ...h, orderIndex: targetPos });
+                                    await actions.hedefDuzenle(targetItem.id, { ...targetItem, orderIndex: currentPos });
+                                };
+
+                                return (
+                                    <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #edf2f7', fontSize: '14px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginRight: '10px' }}>
+                                            <button type="button" onClick={() => move(-1)} disabled={index === 0} style={{ border: 'none', background: 'transparent', cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.3 : 1, fontSize: '10px', padding: 0 }}>▲</button>
+                                            <button type="button" onClick={() => move(1)} disabled={index === array.length - 1} style={{ border: 'none', background: 'transparent', cursor: index === array.length - 1 ? 'default' : 'pointer', opacity: index === array.length - 1 ? 0.3 : 1, fontSize: '10px', padding: 0 }}>▼</button>
+                                        </div>
+                                        <div style={{ flex: 1, marginRight: '15px' }}>
+                                            <div style={{ fontWeight: 'bold', color: '#2d3748', fontSize: '15px' }}>{h.hedefAdi}</div>
+                                            <div style={{ fontSize: '12px', color: '#718096', marginTop: '4px' }}>
+                                                <span style={{ color: tamamlandi ? '#48bb78' : '#805ad5', fontWeight: 'bold' }}>{formatPara(h.biriken)}</span> / {formatPara(h.hedefTutar)}
+                                            </div>
+                                            <div style={{ height: '6px', width: '100%', background: '#edf2f7', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
+                                                <div style={{ height: '100%', width: `${yuzde}%`, background: tamamlandi ? '#48bb78' : '#805ad5', borderRadius: '3px', transition: 'width 0.5s' }}></div>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            {h.urunLinki && (
+                                                <a href={h.urunLinki} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: '14px' }} title="Ürüne Git">🔗</a>
+                                            )}
+                                            {!tamamlandi ? (
+                                                <button onClick={() => openHedefParaEkle(h)} style={{ background: '#e6fffa', color: '#38b2ac', fontWeight: 'bold', border: 'none', cursor: 'pointer', padding: '6px 10px', borderRadius: '6px', fontSize: '12px' }}>+ Ekle</button>
+                                            ) : (
+                                                <button onClick={() => actions.hedefSatinAl(h)} style={{ background: '#c6f6d5', color: '#22543d', fontWeight: 'bold', border: 'none', cursor: 'pointer', padding: '6px 10px', borderRadius: '6px', fontSize: '12px' }}>AL</button>
+                                            )}
+                                            <span onClick={() => openHedefDuzenle(h)} style={{ cursor: 'pointer', fontSize: '14px', opacity: 0.7 }}>✏️</span>
+                                            <span onClick={() => openHedefSilOnay(h)} style={{ cursor: 'pointer', fontSize: '14px', opacity: 0.7 }}>🗑️</span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        {(!hedefler || hedefler.length === 0) && <div style={{ textAlign: 'center', color: '#a0aec0', fontSize: '13px', padding: '20px', background: '#f7fafc', borderRadius: '8px', border: '1px dashed #cbd5e0' }}>Henüz bir hedefiniz yok. Eklemek için aşağıyı kullanın. 👇</div>}
+                    </div>
                 </div>
             </div>
 
@@ -236,7 +268,7 @@ const GoalsInventory = ({
                             </tr>
                         </thead>
                         <tbody>
-                            {[...envanter]
+                            {[...(envanter || [])]
                                 .sort((a, b) => {
                                     // 1. Date Sort (Desc)
                                     const getDate = (item) => {
@@ -284,7 +316,7 @@ const GoalsInventory = ({
                                         </tr>
                                     )
                                 })}
-                            {envanter.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#cbd5e0' }}>Envanter boş.</td></tr>}
+                            {(!envanter || envanter.length === 0) && <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#cbd5e0' }}>Envanter boş.</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -293,10 +325,10 @@ const GoalsInventory = ({
                 <div style={cardStyle}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                         <h4 style={{ margin: 0 }}>💰 Satış & Tahsilat</h4>
-                        <div style={{ fontSize: '12px', color: '#a0aec0' }}>{satislar.length} Kayıt</div>
+                        <div style={{ fontSize: '12px', color: '#a0aec0' }}>{(satislar || []).length} Kayıt</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {[...satislar]
+                        {[...(satislar || [])]
                             .sort((a, b) => {
                                 const dateA = a.tarih?.seconds ? new Date(a.tarih.seconds * 1000) : new Date(a.tarih || 0);
                                 const dateB = b.tarih?.seconds ? new Date(b.tarih.seconds * 1000) : new Date(b.tarih || 0);
@@ -351,7 +383,7 @@ const GoalsInventory = ({
                                     </div>
                                 )
                             })}
-                        {satislar.length === 0 && <div style={{ textAlign: 'center', color: '#a0aec0', fontSize: '13px', padding: '20px' }}>Satış kaydı bulunmuyor.</div>}
+                        {(!satislar || satislar.length === 0) && <div style={{ textAlign: 'center', color: '#a0aec0', fontSize: '13px', padding: '20px' }}>Satış kaydı bulunmuyor.</div>}
                     </div>
                 </div>
 
@@ -366,27 +398,35 @@ const GoalsInventory = ({
                 title="Yeni Ürün Ekle"
                 icon="📦"
             >
-                <form onSubmit={(e) => { e.preventDefault(); actions.envanterEkle({ urunAdi: formUrunAdi, deger: parseFloat(formDeger), odenenTutar: parseFloat(formOdenenTutar), tarih: formTarih }); close(); }}>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setIsProcessing(true);
+                    const success = await actions.envanterEkle({ urunAdi: formUrunAdi, deger: parseFloat(formDeger), odenenTutar: parseFloat(formOdenenTutar), tarih: formTarih });
+                    setIsProcessing(false);
+                    if (success) close();
+                }}>
                     <input autoFocus value={formUrunAdi} onChange={e => setFormUrunAdi(e.target.value)} placeholder="Ürün Adı" style={{ ...inputStyle, marginBottom: '15px' }} required />
                     <input type="number" value={formDeger} onChange={e => { setFormDeger(e.target.value); setFormOdenenTutar(e.target.value); }} placeholder="Alış Maliyeti (₺)" style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input type="number" value={formOdenenTutar} onChange={e => setFormOdenenTutar(e.target.value)} placeholder="Ödenen Tutar" style={{ ...inputStyle, marginBottom: '15px' }} required />
                     <input type="date" value={formTarih} onChange={e => setFormTarih(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
-                    <button type="submit" style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>KAYDET</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'KAYDEDİLİYOR...' : 'KAYDET'}</button>
                 </form>
             </HighQualityModal>
 
             {/* 2. ENVANTER DÜZENLE */}
             <HighQualityModal isOpen={modalState.type === 'envanter_duzenle'} onClose={close} title="Ürün Düzenle" icon="✏️">
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                     e.preventDefault();
-                    actions.envanterGuncelle(modalState.data.id, { urunAdi: formUrunAdi, deger: parseFloat(formDeger), odenenTutar: parseFloat(formOdenenTutar), eklendiTarih: new Date(formTarih) });
-                    close();
+                    setIsProcessing(true);
+                    const success = await actions.envanterGuncelle(modalState.data.id, { urunAdi: formUrunAdi, deger: parseFloat(formDeger), odenenTutar: parseFloat(formOdenenTutar), eklendiTarih: new Date(formTarih) });
+                    setIsProcessing(false);
+                    if (success) close();
                 }}>
                     <input value={formUrunAdi} onChange={e => setFormUrunAdi(e.target.value)} placeholder="Ürün Adı" style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input type="number" value={formDeger} onChange={e => setFormDeger(e.target.value)} placeholder="Alış Maliyeti" style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input type="number" value={formOdenenTutar} onChange={e => setFormOdenenTutar(e.target.value)} placeholder="Ödenen Tutar" style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input type="date" value={formTarih} onChange={e => setFormTarih(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
-                    <button type="submit" style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>GÜNCELLE</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'GÜNCELLENİYOR...' : 'GÜNCELLE'}</button>
                 </form>
             </HighQualityModal>
 
@@ -395,28 +435,47 @@ const GoalsInventory = ({
                 <div style={{ marginBottom: '20px', padding: '10px', background: '#f7fafc', borderRadius: '8px' }}>
                     <b>{modalState.data?.urunAdi}</b> ürününü satıyorsunuz.
                 </div>
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                     e.preventDefault();
-                    if (!formAlici || !formSatisFiyati) return alert("Alıcı ve Fiyat zorunlu.");
-                    if (!formAlici || !formSatisFiyati) return alert("Alıcı ve Fiyat zorunlu.");
-                    actions.envanterSat(modalState.data, { alici: formAlici, satisFiyati: formSatisFiyati, pesinat: formPesinat, tarih: formTarih });
-                    close();
+                    setIsProcessing(true);
+                    if (!formAlici || !formSatisFiyati) {
+                        setIsProcessing(false);
+                        return alert("Alıcı ve Fiyat zorunlu.");
+                    }
+                    const info = {
+                        alici: formAlici,
+                        satisFiyati: parseFloat(formSatisFiyati),
+                        pesinat: parseFloat(formPesinat),
+                        tarih: formTarih
+                    };
+                    const success = await actions.envanterSat(modalState.data, info);
+                    setIsProcessing(false);
+                    if (success) close();
                 }}>
                     <input autoFocus value={formAlici} onChange={e => setFormAlici(e.target.value)} placeholder="Alıcı Adı" style={{ ...inputStyle, marginBottom: '15px' }} required />
                     <input type="number" value={formSatisFiyati} onChange={e => setFormSatisFiyati(e.target.value)} placeholder="Satış Fiyatı (₺)" style={{ ...inputStyle, marginBottom: '15px' }} required />
                     <input type="date" value={formTarih} onChange={e => setFormTarih(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input type="number" value={formPesinat} onChange={e => setFormPesinat(e.target.value)} placeholder="Peşinat (Varsa)" style={{ ...inputStyle, marginBottom: '20px' }} />
-                    <button type="submit" style={{ width: '100%', background: '#805ad5', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>SATIŞI ONAYLA</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#805ad5', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'İŞLENİYOR...' : 'SATIŞI ONAYLA'}</button>
                 </form>
             </HighQualityModal>
 
             {/* 4. SATIŞ DÜZENLE */}
             <HighQualityModal isOpen={modalState.type === 'satis_duzenle'} onClose={close} title="Satış Düzenle" icon="📝">
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                     e.preventDefault();
-                    e.preventDefault();
-                    actions.satisDuzenle(modalState.data.id, { urunAdi: formUrunAdi, alici: formAlici, alisMaliyeti: parseFloat(formAlisMaliyeti), satisFiyati: formSatisFiyati, tahsilEdilen: formTahsilEdilen, tarih: formTarih });
-                    close();
+                    setIsProcessing(true);
+                    const yeni = {
+                        urunAdi: formUrunAdi,
+                        alici: formAlici,
+                        alisMaliyeti: parseFloat(formAlisMaliyeti),
+                        satisFiyati: parseFloat(formSatisFiyati),
+                        tahsilEdilen: parseFloat(formTahsilEdilen),
+                        tarih: formTarih
+                    };
+                    const success = await actions.satisDuzenle(modalState.data.id, yeni);
+                    setIsProcessing(false);
+                    if (success) close();
                 }}>
                     <label style={{ fontSize: '12px', color: '#718096', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Ürün Adı</label>
                     <input value={formUrunAdi} onChange={e => setFormUrunAdi(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
@@ -436,67 +495,110 @@ const GoalsInventory = ({
                     <label style={{ fontSize: '12px', color: '#718096', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Satış Tarihi</label>
                     <input type="date" value={formTarih} onChange={e => setFormTarih(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
 
-                    <button type="submit" style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>KAYDET</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'KAYDEDİLİYOR...' : 'KAYDET'}</button>
                 </form>
             </HighQualityModal>
 
             {/* 5. TAHSİLAT EKLE */}
             <HighQualityModal isOpen={modalState.type === 'tahsilat_ekle'} onClose={close} title="Tahsilat Ekle" icon="💸">
-                <form onSubmit={(e) => { e.preventDefault(); actions.satisTahsilatEkle(modalState.data.id, formEklenenPara); close(); }}>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setIsProcessing(true);
+                    const success = await actions.satisTahsilatEkle(modalState.data.id, formEklenenPara);
+                    setIsProcessing(false);
+                    if (success) close();
+                }}>
                     <div style={{ marginBottom: '15px', color: '#4a5568' }}>Kalan Alacak: <b>{modalState.data ? formatPara(modalState.data.satisFiyati - modalState.data.tahsilEdilen) : 0}</b></div>
                     <input type="number" autoFocus value={formEklenenPara} onChange={e => setFormEklenenPara(e.target.value)} placeholder="Tahsil Edilen Tutar" style={{ ...inputStyle, marginBottom: '20px' }} required />
-                    <button type="submit" style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>EKLE</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'EKLENİYOR...' : 'EKLE'}</button>
                 </form>
             </HighQualityModal>
 
             {/* 6. HEDEF EKLE */}
             <HighQualityModal isOpen={modalState.type === 'hedef_ekle'} onClose={close} title="Yeni Hedef" icon="🎯">
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                     e.preventDefault();
-                    actions.hedefEkle({ hedefAdi: formHedefAd, hedefTutar: parseFloat(formHedefTutar), biriken: parseFloat(formHedefBiriken) || 0, urunLinki: formHedefLink });
-                    close();
+                    setIsProcessing(true);
+                    // biriken default to 0
+                    const success = await actions.hedefEkle({ hedefAdi: formHedefAd, hedefTutar: parseFloat(formHedefTutar), biriken: 0, urunLinki: formHedefLink });
+                    setIsProcessing(false);
+                    if (success) close();
                 }}>
                     <input autoFocus value={formHedefAd} onChange={e => setFormHedefAd(e.target.value)} placeholder="Hedef Adı (Örn: iPhone 15)" style={{ ...inputStyle, marginBottom: '15px' }} required />
                     <input type="number" value={formHedefTutar} onChange={e => setFormHedefTutar(e.target.value)} placeholder="Hedeflenen Tutar (₺)" style={{ ...inputStyle, marginBottom: '15px' }} required />
-                    <input type="number" value={formHedefBiriken} onChange={e => setFormHedefBiriken(e.target.value)} placeholder="Başlangıç Birikimi (Opsiyonel)" style={{ ...inputStyle, marginBottom: '15px' }} />
+                    {/* biriken input removed as per request */}
                     <input value={formHedefLink} onChange={e => setFormHedefLink(e.target.value)} placeholder="Ürün Linki (Opsiyonel)" style={{ ...inputStyle, marginBottom: '20px' }} />
-                    <button type="submit" style={{ width: '100%', background: '#805ad5', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>OLUŞTUR</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#805ad5', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'KAYDEDİLİYOR...' : 'KAYDET'}</button>
                 </form>
             </HighQualityModal>
 
             {/* 7. HEDEF DÜZENLE */}
             <HighQualityModal isOpen={modalState.type === 'hedef_duzenle'} onClose={close} title="Hedef Düzenle" icon="✏️">
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                     e.preventDefault();
-                    actions.hedefDuzenle(modalState.data.id, { hedefAdi: formHedefAd, hedefTutar: parseFloat(formHedefTutar), biriken: parseFloat(formHedefBiriken) || 0, urunLinki: formHedefLink });
-                    close();
+                    setIsProcessing(true);
+                    const success = await actions.hedefDuzenle(modalState.data.id, { hedefAdi: formHedefAd, hedefTutar: parseFloat(formHedefTutar), biriken: parseFloat(formHedefBiriken) || 0, urunLinki: formHedefLink });
+                    setIsProcessing(false);
+                    if (success) close();
                 }}>
                     <input value={formHedefAd} onChange={e => setFormHedefAd(e.target.value)} placeholder="Hedef Adı" style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input type="number" value={formHedefTutar} onChange={e => setFormHedefTutar(e.target.value)} placeholder="Hedef Tutar" style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input type="number" value={formHedefBiriken} onChange={e => setFormHedefBiriken(e.target.value)} placeholder="Biriken" style={{ ...inputStyle, marginBottom: '15px' }} />
                     <input value={formHedefLink} onChange={e => setFormHedefLink(e.target.value)} placeholder="Link" style={{ ...inputStyle, marginBottom: '20px' }} />
-                    <button type="submit" style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>KAYDET</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'KAYDEDİLİYOR...' : 'KAYDET'}</button>
                 </form>
             </HighQualityModal>
 
             {/* 8. HEDEF PARA EKLE */}
             <HighQualityModal isOpen={modalState.type === 'hedef_para_ekle'} onClose={close} title="Para Ekle" icon="💰">
-                <form onSubmit={(e) => { e.preventDefault(); actions.hedefParaEkle(modalState.data.id, formEklenenPara); close(); }}>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setIsProcessing(true);
+                    const success = await actions.hedefParaEkle(modalState.data.id, formEklenenPara);
+                    setIsProcessing(false);
+                    if (success) close();
+                }}>
                     <div style={{ marginBottom: '15px', padding: '10px', background: '#f0fff4', color: '#276749', borderRadius: '8px' }}>
                         <b>{modalState.data?.hedefAdi}</b> için birikim ekliyorsunuz.
                     </div>
                     <input type="number" autoFocus value={formEklenenPara} onChange={e => setFormEklenenPara(e.target.value)} placeholder="Eklenecek Tutar (₺)" style={{ ...inputStyle, marginBottom: '20px' }} required />
-                    <button type="submit" style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>EKLE</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'EKLENİYOR...' : 'EKLE'}</button>
                 </form>
             </HighQualityModal>
 
             {/* 9. ENVANTER ÖDEME YAP */}
             <HighQualityModal isOpen={modalState.type === 'envanter_odeme_yap'} onClose={close} title="Tedarikçi Ödemesi" icon="💸">
-                <form onSubmit={(e) => { e.preventDefault(); actions.envanterOdemeYap(modalState.data.id, formEklenenBorcOdeme); close(); }}>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setIsProcessing(true);
+                    const success = await actions.envanterOdemeYap(modalState.data.id, formEklenenBorcOdeme);
+                    setIsProcessing(false);
+                    if (success) close();
+                }}>
                     <div style={{ marginBottom: '15px', color: '#4a5568' }}>Kalan Borç: <b>{modalState.data ? formatPara(modalState.data.deger - (modalState.data.odenenTutar || 0)) : 0}</b></div>
                     <input type="number" autoFocus value={formEklenenBorcOdeme} onChange={e => setFormEklenenBorcOdeme(e.target.value)} placeholder="Ödenecek Tutar" style={{ ...inputStyle, marginBottom: '20px' }} required />
-                    <button type="submit" style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>ÖDE</button>
+                    <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#38a169', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'ÖDENİYOR...' : 'ÖDE'}</button>
                 </form>
+            </HighQualityModal>
+
+            {/* 10. HEDEF SİL ONAY */}
+            <HighQualityModal isOpen={modalState.type === 'hedef_sil_onay'} onClose={close} title="Hedefi Sil" icon="🗑️">
+                <div style={{ marginBottom: '20px', color: '#4a5568' }}>
+                    <b>{modalState.data?.hedefAdi}</b> hedefini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={close} disabled={isProcessing} style={{ flex: 1, padding: '12px', background: '#edf2f7', color: '#4a5568', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        İPTAL
+                    </button>
+                    <button onClick={async () => {
+                        setIsProcessing(true);
+                        const success = await actions.hedefSil(modalState.data.id);
+                        setIsProcessing(false);
+                        if (success) close();
+                    }} disabled={isProcessing} style={{ flex: 1, padding: '12px', background: '#e53e3e', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: isProcessing ? 'default' : 'pointer', opacity: isProcessing ? 0.7 : 1 }}>
+                        {isProcessing ? 'SİLİNİYOR...' : 'SİL'}
+                    </button>
+                </div>
             </HighQualityModal>
 
         </div >

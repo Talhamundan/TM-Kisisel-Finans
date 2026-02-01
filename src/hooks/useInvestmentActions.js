@@ -21,26 +21,46 @@ export const useInvestmentActions = (user, alanKodu) => {
     // InvestmentDashboard receives yatirimArama etc.
 
     const yatirimAl = async (e) => {
-        e.preventDefault();
-        if (!sembol || !adet || !alisFiyati || !yatirimHesapId || !varlikTuru) return toast.error("Tüm bilgileri girin");
-        const sAdet = parseFloat(adet);
-        const sFiyat = parseFloat(alisFiyati);
-        const toplam = sAdet * sFiyat;
-        const tarih = new Date();
-        await addDoc(collection(db, "portfoy"), { uid: user.uid, alanKodu, sembol: sembol.toUpperCase(), varlikTuru, adet: sAdet, alisFiyati: sFiyat, guncelFiyat: sFiyat, tarih: tarih });
-        await updateDoc(doc(db, "hesaplar", yatirimHesapId), { guncelBakiye: increment(-toplam) });
-        await addDoc(collection(db, "nakit_islemleri"), {
-            uid: user.uid,
-            alanKodu,
-            hesapId: yatirimHesapId,
-            islemTipi: "yatirim_alis",
-            kategori: "Yatırım",
-            yatirimTuru: varlikTuru,
-            tutar: toplam,
-            aciklama: `${sembol.toUpperCase()} Alış`,
-            tarih: tarih
-        });
-        toast.success(`${sembol.toUpperCase()} alındı!`); setSembol(""); setAdet(""); setAlisFiyati("");
+        if (e) e.preventDefault();
+        try {
+            if (!sembol || !adet || !alisFiyati || !yatirimHesapId || !varlikTuru) {
+                toast.error("Tüm bilgileri girin");
+                return false;
+            }
+            const sAdet = parseFloat(adet);
+            const sFiyat = parseFloat(alisFiyati);
+            if (isNaN(sAdet) || isNaN(sFiyat)) {
+                toast.error("Geçersiz değerler");
+                return false;
+            }
+            const toplam = sAdet * sFiyat;
+            const tarih = new Date();
+
+            // Check Balance Logic could go here (optional but good)
+
+            await addDoc(collection(db, "portfoy"), { uid: user.uid, alanKodu, sembol: sembol.toUpperCase(), varlikTuru, adet: sAdet, alisFiyati: sFiyat, guncelFiyat: sFiyat, tarih: tarih });
+            await updateDoc(doc(db, "hesaplar", yatirimHesapId), { guncelBakiye: increment(-toplam) });
+            await addDoc(collection(db, "nakit_islemleri"), {
+                uid: user.uid,
+                alanKodu,
+                hesapId: yatirimHesapId,
+                islemTipi: "yatirim_alis",
+                kategori: "Yatırım",
+                yatirimTuru: varlikTuru,
+                tutar: toplam,
+                adet: sAdet,
+                birimFiyat: sFiyat,
+                aciklama: `${sembol.toUpperCase()} Alış`,
+                tarih: tarih
+            });
+            toast.success(`${sembol.toUpperCase()} alındı!`);
+            setSembol(""); setAdet(""); setAlisFiyati("");
+            return true;
+        } catch (error) {
+            console.error(error);
+            toast.error("Yatırım işlemi başarısız.");
+            return false;
+        }
     }
 
     const satisYap = async (seciliVeri, secilenHesapId, satisFiyati) => {
@@ -69,6 +89,9 @@ export const useInvestmentActions = (user, alanKodu) => {
             kategori: "Yatırım",
             yatirimTuru: seciliVeri.varlikTuru,
             tutar: toplam,
+            adet: seciliVeri.adet, // NEW: Quantity
+            birimFiyat: parseFloat(satisFiyati), // NEW: Unit Price
+            alisBirimFiyat: seciliVeri.alisFiyati, // NEW: Cost Basis for P/L
             aciklama: `${seciliVeri.sembol} Satış`,
             tarih: new Date()
         });
@@ -80,73 +103,115 @@ export const useInvestmentActions = (user, alanKodu) => {
 
     const piyasalariGuncelle = async (portfoy) => {
         setGuncelleniyor(true);
-        try {
-            // Döviz Verileri (Frankfurter API - Ücretsiz & Halka Açık)
-            const res = await fetch("https://api.frankfurter.app/latest?from=USD&to=TRY,EUR");
-            const data = await res.json();
-            const usdTry = data.rates.TRY;
-            const eurTry = (1 / data.rates.EUR) * usdTry;
+        const US_STOCKS = ["AAPL", "MSFT", "TSLA", "NVDA", "AMZN", "GOOGL", "META", "NFLX", "AMD", "INTC", "PLTR", "COIN", "MSGI", "VOO", "VTI", "QQQ", "SPY"];
+        const FINNHUB_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
 
-            // Altın Tahmini (Global ONS fiyatı sabit alınıp Dolar/TL ile çarpılıyor - yaklaşık değer)
-            // Daha hassas veri için GoldAPI gerekir ama bu şimdilik "Rastgele"den iyidir.
-            // ONS Altın ~2650$ varsayıldı.
-            const gramAltin = (2650 * usdTry) / 31.1035;
+        // --- HELPER: Finnhub (US) ---
+        const fetchFinnhubPrice = async (symbol) => {
+            if (!FINNHUB_KEY) {
+                console.warn("Finnhub API Key missing (.env file: VITE_FINNHUB_API_KEY)");
+                return null;
+            }
+            try {
+                const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`);
+                if (!res.ok) throw new Error("Finnhub API Error");
+                const data = await res.json();
+                return data.c; // 'c' is Current Price
+            } catch (err) {
+                console.error(`Finnhub Error (${symbol}):`, err);
+                return null;
+            }
+        };
+
+        // --- HELPER: Yahoo Finance (BIST / Fallback) ---
+        const fetchYahooPrice = async (symbol) => {
+            try {
+                // Using corsproxy.io for reliability
+                const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("Yahoo API Error");
+                const data = await res.json();
+                const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+                return price ? parseFloat(price) : null;
+            } catch (err) {
+                console.error(`Yahoo Error (${symbol}):`, err);
+                return null;
+            }
+        };
+
+        try {
+            // 1. DOVIZ & ALTIN BASE RATES
+            let usdTry = 36.50; // Fallback
+            let eurTry = 38.50;
+            let gramAltin = 3000;
+
+            try {
+                const res = await fetch("https://api.frankfurter.app/latest?from=USD&to=TRY,EUR");
+                const data = await res.json();
+                usdTry = data.rates.TRY;
+                eurTry = (1 / data.rates.EUR) * usdTry; // Cross rate calculation
+                // Gram Gold Approx: ONS ~$2750 / 31.1035 * USDTRY
+                gramAltin = (2750 * usdTry) / 31.1035;
+            } catch (e) {
+                console.warn("Currency API failed, using fallbacks.", e);
+            }
 
             const promises = portfoy.map(async (p) => {
-                let y = null;
+                let yeniFiyat = null;
+                const rawSymbol = p.sembol?.toUpperCase().trim();
 
-                // 1. DÖVİZ
+                // A. DOVIZ
                 if (p.varlikTuru === 'doviz') {
-                    if (p.sembol === 'USD') y = usdTry;
-                    else if (p.sembol === 'EUR') y = eurTry;
+                    if (rawSymbol === 'USD') yeniFiyat = usdTry;
+                    else if (rawSymbol === 'EUR') yeniFiyat = eurTry;
                 }
-
-                // 2. ALTIN
+                // B. ALTIN
                 else if (p.varlikTuru === 'altin') {
-                    y = gramAltin;
+                    yeniFiyat = gramAltin;
                 }
-
-                // 3. HİSSE / FON (Yahoo Finance)
+                // C. HISSE / FON (HYBRID LOGIC)
                 else {
-                    let sembol = p.sembol.toUpperCase().trim();
-                    // BIST hissesi varsayımıyla .IS ekle (Eğer nokta yoksa)
-                    if (!sembol.includes('.')) {
-                        sembol += ".IS";
-                    }
+                    const isUS = US_STOCKS.includes(rawSymbol);
 
-                    try {
-                        // Yahoo Finance API via CORS Proxy
-                        // Not: corsproxy.io herkese açık bir servistir.
-                        const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${sembol}`;
-                        const resHisse = await fetch(url);
-
-                        if (resHisse.ok) {
-                            const dataHisse = await resHisse.json();
-                            const fiyat = dataHisse?.chart?.result?.[0]?.meta?.regularMarketPrice;
-                            if (fiyat) y = parseFloat(fiyat);
-                        } else {
-                            console.warn(`${sembol} için API yanıt vermedi.`);
+                    if (isUS) {
+                        // Priority 1: Finnhub
+                        yeniFiyat = await fetchFinnhubPrice(rawSymbol);
+                        // Fallback: Yahoo (if Finnhub fails/no key)
+                        if (!yeniFiyat) {
+                            yeniFiyat = await fetchYahooPrice(rawSymbol);
                         }
-                    } catch (err) {
-                        console.warn(`${sembol} fiyatı çekilemedi`, err);
-                        // Hata durumunda y null kalır, eski fiyat korunur.
+                    } else {
+                        // BIST / OTHER
+                        let yahooSymbol = rawSymbol;
+                        // Smart Suffix: If length > 5 (e.g. THYAO, GARAN) and no dot, add .IS
+                        // Keep symbols like "SISE.IS", "KCHOL.IS" as is.
+                        // Keep "USDTRY", "XcU" etc as is if user entered widely
+                        // BUT user specific requirement: "If length > 5 or special format -> add .IS"
+                        // Standard BIST codes are 5 chars (THYAO). 
+                        // Let's allow 4-5 chars to explicitly append .IS if no dot is present.
+                        if (!yahooSymbol.includes('.')) {
+                            yahooSymbol += ".IS";
+                        }
+                        yeniFiyat = await fetchYahooPrice(yahooSymbol);
                     }
                 }
 
-                if (y) {
-                    await updateDoc(doc(db, "portfoy", p.id), { guncelFiyat: parseFloat(y.toFixed(4)) });
+                // UPDATE DB
+                if (yeniFiyat) {
+                    await updateDoc(doc(db, "portfoy", p.id), { guncelFiyat: parseFloat(yeniFiyat.toFixed(4)) });
                 }
             });
 
             await Promise.all(promises);
-            toast.success("Tüm portföy fiyatları (Döviz, Altın ve Hisseler) başarıyla güncellendi");
+            toast.success("Tüm fiyatlar güncellendi (Finnhub & Yahoo).");
         } catch (e) {
-            console.error(e);
-            toast.error("Güncelleme sırasında bir hata oluştu");
+            console.error("Critical Update Error:", e);
+            toast.error("Güncelleme başarısız oldu.");
         } finally {
             setGuncelleniyor(false);
         }
     }
+
 
     // --- PORTFÖY YÖNETİMİ (SİLME & DÜZENLEME) ---
     const portfoySil = async (idOrIds) => {
@@ -242,7 +307,6 @@ export const useInvestmentActions = (user, alanKodu) => {
         varlikTuru, setVarlikTuru,
         yatirimHesapId, setYatirimHesapId,
         tahsilatTutar, setTahsilatTutar,
-        guncelleniyor,
         guncelleniyor,
         yatirimAl, satisYap, fiyatGuncelle, piyasalariGuncelle, besGuncelle,
         portfoySil, portfoyDuzenle, fillPortfolioForm,
@@ -360,60 +424,89 @@ export const useInvestmentActions = (user, alanKodu) => {
 
         // --- HEDEFLER ---
         hedefEkle: async (yeniHedef) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const liste = data.hedefler || [];
-                await updateDoc(docRef, { hedefler: [...liste, { id: crypto.randomUUID(), ...yeniHedef }] });
-                toast.success("Hedef eklendi.");
-            }
+            if (!alanKodu) return false;
+            try {
+                if (!yeniHedef.hedefAdi || !yeniHedef.hedefTutar) {
+                    toast.warning("Hedef adı ve tutarı zorunludur.");
+                    return false;
+                }
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const liste = data.hedefler || [];
+                    await updateDoc(docRef, { hedefler: [...liste, { id: crypto.randomUUID(), ...yeniHedef }] });
+                    toast.success("Hedef eklendi.");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         hedefSil: async (id) => {
-            if (!alanKodu) return;
-            if (!window.confirm("Silmek istediğinize emin misiniz?")) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const liste = data.hedefler || [];
-                const yeniListe = liste.filter(i => i.id !== id);
-                await updateDoc(docRef, { hedefler: yeniListe });
-                toast.success("Hedef silindi.");
+            if (!alanKodu) return false;
+            // Removed window.confirm -> Handled by Modal
+            try {
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const liste = data.hedefler || [];
+                    const yeniListe = liste.filter(i => i.id !== id);
+                    await updateDoc(docRef, { hedefler: yeniListe });
+                    toast.success("Hedef silindi.");
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error(error);
+                toast.error("Silme hatası");
+                return false;
             }
         },
 
         hedefParaEkle: async (id, miktar) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const liste = data.hedefler || [];
-                const yeniListe = liste.map(h => {
-                    if (h.id === id) {
-                        return { ...h, biriken: (parseFloat(h.biriken) || 0) + parseFloat(miktar) };
-                    }
-                    return h;
-                });
-                await updateDoc(docRef, { hedefler: yeniListe });
-                toast.success("Hedefer para eklendi.");
-            }
+            if (!alanKodu) return false;
+            try {
+                const eklenecek = parseFloat(miktar);
+                if (isNaN(eklenecek) || eklenecek <= 0) {
+                    toast.warning("Geçerli bir miktar giriniz.");
+                    return false;
+                }
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const liste = data.hedefler || [];
+                    const yeniListe = liste.map(h => {
+                        if (h.id === id) {
+                            return { ...h, biriken: (parseFloat(h.biriken) || 0) + eklenecek };
+                        }
+                        return h;
+                    });
+                    await updateDoc(docRef, { hedefler: yeniListe });
+                    toast.success("Hedefe para eklendi.");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         hedefDuzenle: async (id, yeniVeri) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const liste = data.hedefler || [];
-                const yeniListe = liste.map(h => h.id === id ? { ...h, ...yeniVeri } : h);
-                await updateDoc(docRef, { hedefler: yeniListe });
-                toast.success("Hedef güncellendi.");
-            }
+            if (!alanKodu) return false;
+            try {
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const liste = data.hedefler || [];
+                    const yeniListe = liste.map(h => h.id === id ? { ...h, ...yeniVeri } : h);
+                    await updateDoc(docRef, { hedefler: yeniListe });
+                    toast.success("Hedef güncellendi.");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         hedefSatinAl: async (hedef) => {
@@ -446,60 +539,81 @@ export const useInvestmentActions = (user, alanKodu) => {
 
         // --- ENVANTER ---
         envanterEkle: async (yeniUrun) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const liste = data.envanter || [];
-                const eklendiTarih = yeniUrun.tarih ? new Date(yeniUrun.tarih) : new Date();
+            if (!alanKodu) return false;
+            try {
+                if (!yeniUrun.urunAdi) {
+                    toast.warning("Ürün adı gereklidir.");
+                    return false;
+                }
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const liste = data.envanter || [];
+                    const eklendiTarih = yeniUrun.tarih ? new Date(yeniUrun.tarih) : new Date();
 
-                await updateDoc(docRef, {
-                    envanter: [...liste, {
-                        id: crypto.randomUUID(),
-                        ...yeniUrun,
-                        odenenTutar: yeniUrun.odenenTutar !== undefined ? parseFloat(yeniUrun.odenenTutar) : parseFloat(yeniUrun.deger), // Default to full paid if not specified
-                        eklendiTarih: eklendiTarih
-                    }]
-                });
-                toast.success("Envantere eklendi.");
-            }
+                    await updateDoc(docRef, {
+                        envanter: [...liste, {
+                            id: crypto.randomUUID(),
+                            ...yeniUrun,
+                            odenenTutar: yeniUrun.odenenTutar !== undefined ? parseFloat(yeniUrun.odenenTutar) : parseFloat(yeniUrun.deger),
+                            eklendiTarih: eklendiTarih
+                        }]
+                    });
+                    toast.success("Envantere eklendi.");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         envanterOdemeYap: async (id, miktar) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const liste = data.envanter || [];
-                const yeniListe = liste.map(item => {
-                    if (item.id === id) {
-                        return { ...item, odenenTutar: (parseFloat(item.odenenTutar) || 0) + parseFloat(miktar) };
-                    }
-                    return item;
-                });
-                await updateDoc(docRef, { envanter: yeniListe });
-                toast.success("Tedarikçi ödemesi kaydedildi.");
-            }
+            if (!alanKodu) return false;
+            try {
+                const amount = parseFloat(miktar);
+                if (isNaN(amount) || amount <= 0) {
+                    toast.warning("Geçerli miktar girin.");
+                    return false;
+                }
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const liste = data.envanter || [];
+                    const yeniListe = liste.map(item => {
+                        if (item.id === id) {
+                            return { ...item, odenenTutar: (parseFloat(item.odenenTutar) || 0) + amount };
+                        }
+                        return item;
+                    });
+                    await updateDoc(docRef, { envanter: yeniListe });
+                    toast.success("Tedarikçi ödemesi kaydedildi.");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         envanterGuncelle: async (id, guncelVeri) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const liste = data.envanter || [];
-                const yeniListe = liste.map(item => {
-                    if (item.id === id) {
-                        return { ...item, ...guncelVeri };
-                    }
-                    return item;
-                });
-                await updateDoc(docRef, { envanter: yeniListe });
-                toast.success("Envanter güncellendi.");
-            }
+            if (!alanKodu) return false;
+            try {
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const liste = data.envanter || [];
+                    const yeniListe = liste.map(item => {
+                        if (item.id === id) {
+                            return { ...item, ...guncelVeri };
+                        }
+                        return item;
+                    });
+                    await updateDoc(docRef, { envanter: yeniListe });
+                    toast.success("Envanter güncellendi.");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         envanterSil: async (id) => {
@@ -518,66 +632,76 @@ export const useInvestmentActions = (user, alanKodu) => {
 
         // --- SATIŞ & ALACAKLAR ---
         envanterSat: async (urun, satisBilgileri) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
+            if (!alanKodu) return false;
+            try {
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
 
-            if (snap.exists()) {
-                const data = snap.data();
+                if (snap.exists()) {
+                    const data = snap.data();
 
-                // 1. Envanterden Çıkar
-                const envanterListe = data.envanter || [];
-                const yeniEnvanter = envanterListe.filter(e => e.id !== urun.id);
+                    // 1. Envanterden Çıkar
+                    const envanterListe = data.envanter || [];
+                    const yeniEnvanter = envanterListe.filter(e => e.id !== urun.id);
 
-                // 2. Satışlara Ekle
-                const satislarListe = data.satislar || [];
-                const satisObj = {
-                    id: crypto.randomUUID(),
-                    urunAdi: urun.ad || urun.urunAdi,
-                    alici: satisBilgileri.alici,
-                    satisFiyati: parseFloat(satisBilgileri.satisFiyati),
-                    alisMaliyeti: parseFloat(urun.deger || 0), // Include Purchase Cost for P/L
-                    odenenTutar: urun.odenenTutar !== undefined ? parseFloat(urun.odenenTutar) : parseFloat(urun.deger || 0), // Carry over paid amount for Cash Flow
-                    tahsilEdilen: parseFloat(satisBilgileri.pesinat || 0),
-                    tarih: satisBilgileri.tarih ? new Date(satisBilgileri.tarih) : new Date(),
-                    durum: (parseFloat(satisBilgileri.satisFiyati) - parseFloat(satisBilgileri.pesinat || 0)) <= 0 ? 'Tamamlandı' : 'Borcu Var'
-                };
+                    // 2. Satışlara Ekle
+                    const satislarListe = data.satislar || [];
+                    const satisObj = {
+                        id: crypto.randomUUID(),
+                        urunAdi: urun.ad || urun.urunAdi,
+                        alici: satisBilgileri.alici,
+                        satisFiyati: parseFloat(satisBilgileri.satisFiyati),
+                        alisMaliyeti: parseFloat(urun.deger || 0),
+                        odenenTutar: urun.odenenTutar !== undefined ? parseFloat(urun.odenenTutar) : parseFloat(urun.deger || 0),
+                        tahsilEdilen: parseFloat(satisBilgileri.pesinat || 0),
+                        tarih: satisBilgileri.tarih ? new Date(satisBilgileri.tarih) : new Date(),
+                        durum: (parseFloat(satisBilgileri.satisFiyati) - parseFloat(satisBilgileri.pesinat || 0)) <= 0 ? 'Tamamlandı' : 'Borcu Var'
+                    };
 
-                await updateDoc(docRef, {
-                    envanter: yeniEnvanter,
-                    satislar: [...satislarListe, satisObj]
-                });
-                toast.success("Satış kaydı oluşturuldu!");
-            }
+                    await updateDoc(docRef, {
+                        envanter: yeniEnvanter,
+                        satislar: [...satislarListe, satisObj]
+                    });
+                    toast.success("Satış kaydı oluşturuldu!");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         satisTahsilatEkle: async (satisId, miktar) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
+            if (!alanKodu) return false;
+            try {
+                const amount = parseFloat(miktar);
+                if (isNaN(amount) || amount <= 0) return false;
 
-            if (snap.exists()) {
-                const data = snap.data();
-                const satislarListe = data.satislar || [];
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
 
-                const updatedList = satislarListe.map(s => {
-                    if (s.id === satisId) {
-                        const yeniTahsilat = (s.tahsilEdilen || 0) + parseFloat(miktar);
-                        const kalan = s.satisFiyati - yeniTahsilat;
-                        return {
-                            ...s,
-                            tahsilEdilen: yeniTahsilat,
-                            durum: kalan <= 0.1 ? 'Tamamlandı' : 'Borcu Var' // Tolerance for loose change
-                        };
-                    }
-                    return s;
-                });
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const satislarListe = data.satislar || [];
 
-                await updateDoc(docRef, { satislar: updatedList });
-                await updateDoc(docRef, { satislar: updatedList });
-                toast.success("Tahsilat işlendi.");
-                setTahsilatTutar("");
-            }
+                    const updatedList = satislarListe.map(s => {
+                        if (s.id === satisId) {
+                            const yeniTahsilat = (s.tahsilEdilen || 0) + amount;
+                            const kalan = s.satisFiyati - yeniTahsilat;
+                            return {
+                                ...s,
+                                tahsilEdilen: yeniTahsilat,
+                                durum: kalan <= 0.1 ? 'Tamamlandı' : 'Borcu Var'
+                            };
+                        }
+                        return s;
+                    });
+
+                    await updateDoc(docRef, { satislar: updatedList });
+                    toast.success("Tahsilat işlendi.");
+                    setTahsilatTutar("");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
         },
 
         satisSil: async (id) => {
@@ -595,36 +719,153 @@ export const useInvestmentActions = (user, alanKodu) => {
         },
 
         satisDuzenle: async (id, yeniBilgiler) => {
-            if (!alanKodu) return;
-            const docRef = doc(db, "ayarlar", alanKodu);
-            const snap = await getDoc(docRef);
+            if (!alanKodu) return false;
+            try {
+                const docRef = doc(db, "ayarlar", alanKodu);
+                const snap = await getDoc(docRef);
 
-            if (snap.exists()) {
-                const data = snap.data();
-                const satislarListe = data.satislar || [];
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const satislarListe = data.satislar || [];
 
-                const updatedList = satislarListe.map(s => {
-                    if (s.id === id) {
-                        const fiyat = parseFloat(yeniBilgiler.satisFiyati);
-                        const tahsil = parseFloat(yeniBilgiler.tahsilEdilen);
-                        const kalan = fiyat - tahsil;
-                        return {
-                            ...s,
-                            urunAdi: yeniBilgiler.urunAdi,
-                            alici: yeniBilgiler.alici,
-                            alisMaliyeti: parseFloat(yeniBilgiler.alisMaliyeti || 0), // Fix: Persist Cost
-                            satisFiyati: fiyat,
-                            tahsilEdilen: tahsil,
-                            durum: kalan <= 0.1 ? 'Tamamlandı' : 'Borcu Var',
-                            tarih: yeniBilgiler.tarih ? new Date(yeniBilgiler.tarih) : s.tarih
-                        };
+                    const updatedList = satislarListe.map(s => {
+                        if (s.id === id) {
+                            const fiyat = parseFloat(yeniBilgiler.satisFiyati);
+                            const tahsil = parseFloat(yeniBilgiler.tahsilEdilen);
+                            const kalan = fiyat - tahsil;
+                            return {
+                                ...s,
+                                urunAdi: yeniBilgiler.urunAdi,
+                                alici: yeniBilgiler.alici,
+                                alisMaliyeti: parseFloat(yeniBilgiler.alisMaliyeti || 0),
+                                satisFiyati: fiyat,
+                                tahsilEdilen: tahsil,
+                                durum: kalan <= 0.1 ? 'Tamamlandı' : 'Borcu Var',
+                                tarih: yeniBilgiler.tarih ? new Date(yeniBilgiler.tarih) : s.tarih
+                            };
+                        }
+                        return s;
+                    });
+
+                    await updateDoc(docRef, { satislar: updatedList });
+                    toast.success("Kayıt güncellendi.");
+                    return true;
+                }
+                return false;
+            } catch (err) { console.error(err); return false; }
+        },
+
+        // --- GENEL İŞLEM YÖNETİMİ (ROLLBACK ile) ---
+        islemSil: async (id) => {
+            if (!window.confirm("Bu işlemi silmek istediğinize emin misiniz? Bakiye geri alınacaktır.")) return;
+            try {
+                const docRef = doc(db, "nakit_islemleri", id);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+
+                    // CASH ROLLBACK LOGIC
+                    if (data.hesapId) {
+                        const amount = parseFloat(data.tutar);
+                        if (data.islemTipi === 'yatirim_alis') {
+                            // Buying removed -> Money returns to wallet (Increase Balance)
+                            await updateDoc(doc(db, "hesaplar", data.hesapId), { guncelBakiye: increment(amount) });
+                        } else if (data.islemTipi === 'yatirim_satis') {
+                            // Selling removed -> Money taken back from wallet (Decrease Balance)
+                            await updateDoc(doc(db, "hesaplar", data.hesapId), { guncelBakiye: increment(-amount) });
+                        }
                     }
-                    return s;
-                });
 
-                await updateDoc(docRef, { satislar: updatedList });
-                toast.success("Kayıt güncellendi.");
+                    await deleteDoc(docRef);
+                    toast.success("İşlem silindi ve bakiye güncellendi.");
+                }
+            } catch (error) {
+                console.error(error);
+                toast.error("Silme hatası");
+            }
+        },
+
+        // --- POZİSYON YÖNETİMİ ---
+        pozisyonSil: async (row) => {
+            // Confirmation handled by Modal
+            try {
+                // 1. HIDE CLOSED (SELL) LEG
+                if (row.isClosed && row.sellContext) {
+                    const sellId = row.sellContext.id;
+                    const docRef = doc(db, "nakit_islemleri", sellId);
+                    // Soft delete for Analysis only
+                    await updateDoc(docRef, { analizdenGizle: true });
+                    toast.success("Kayıt analizden gizlendi (Geçmişte duruyor).");
+                }
+                // 2. HIDE OPEN (BUY) LEG
+                else if (!row.isClosed && row.buyContext) {
+                    const buyId = row.buyContext.id;
+                    const docRef = doc(db, "nakit_islemleri", buyId);
+                    // Soft delete for Analysis only
+                    await updateDoc(docRef, { analizdenGizle: true });
+                    toast.success("Kayıt analizden gizlendi (Geçmişte duruyor).");
+                }
+            } catch (e) {
+                console.error(e);
+                toast.error("Silme sırasında hata oluştu.");
+            }
+        },
+
+        pozisyonGuncelle: async (buyData, sellData) => {
+            try {
+                // 1. UPDATE BUY
+                if (buyData && buyData.id) {
+                    const docRef = doc(db, "nakit_islemleri", buyData.id);
+                    const snap = await getDoc(docRef);
+                    if (snap.exists()) {
+                        const oldData = snap.data();
+                        const oldTotal = parseFloat(oldData.tutar);
+
+                        const newPrice = parseFloat(buyData.fiyat);
+                        const newQty = parseFloat(buyData.adet);
+                        const newTotal = newPrice * newQty;
+
+                        // const diff = oldTotal - newTotal;
+                        // DISABLED BALANCE UPDATE:
+                        // if (oldData.hesapId && Math.abs(diff) > 0.01) {
+                        //    await updateDoc(doc(db, "hesaplar", oldData.hesapId), { guncelBakiye: increment(diff) });
+                        // }
+
+                        // Use 'analiz_' prefix to decouple from History
+                        await updateDoc(docRef, {
+                            analiz_birimFiyat: newPrice,
+                            analiz_adet: newQty,
+                            analiz_tutar: newTotal,
+                            analiz_tarih: new Date(buyData.tarih) // Store as Timestamp or Date? updateDoc handles Date.
+                        });
+                    }
+                }
+
+                // 2. UPDATE SELL
+                if (sellData && sellData.id) {
+                    const docRef = doc(db, "nakit_islemleri", sellData.id);
+                    const snap = await getDoc(docRef);
+                    if (snap.exists()) {
+
+                        const newPrice = parseFloat(sellData.fiyat);
+                        const newQty = parseFloat(sellData.adet);
+                        const newTotal = newPrice * newQty;
+
+                        await updateDoc(docRef, {
+                            analiz_birimFiyat: newPrice,
+                            analiz_adet: newQty,
+                            analiz_tutar: newTotal,
+                            analiz_tarih: new Date(sellData.tarih)
+                        });
+                    }
+                }
+
+                toast.success("Analiz verisi güncellendi (İşlem geçmişi değişmedi).");
                 return true;
+            } catch (error) {
+                console.error(error);
+                toast.error("Güncelleme hatası");
+                return false;
             }
         }
     };
