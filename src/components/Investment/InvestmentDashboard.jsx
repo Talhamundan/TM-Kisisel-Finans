@@ -34,7 +34,7 @@ const InvestmentDashboard = ({
     filtreYatirimTuru, setFiltreYatirimTuru,
     mevcutAylar,
     // Actions
-    islemSil, portfoySil, fiyatGuncelle,
+    islemSil, fiyatGuncelle,
     // BES
     besVerisi,
     toplamBesYatirimi,
@@ -199,7 +199,7 @@ const InvestmentDashboard = ({
                                     <td>
                                         <button onClick={() => modalAc('satis', p)} style={{ background: '#edf2f7', color: '#333', border: 'none', borderRadius: '5px', fontSize: '12px', padding: '5px 10px', cursor: 'pointer', fontWeight: 'bold' }}>Sat</button>
                                         <span onClick={() => modalAc('duzenle_portfoy', p)} style={{ cursor: 'pointer', marginLeft: '5px' }}>✏️</span>
-                                        <span onClick={() => portfoySil(p.ids)} style={{ cursor: 'pointer', fontSize: '14px', marginLeft: '5px' }}>🗑️</span>
+                                        <span onClick={() => modalAc('pozisyon_sil_onay', { row: p })} style={{ cursor: 'pointer', fontSize: '14px', marginLeft: '5px' }}>🗑️</span>
                                     </td>
                                     <td></td> {/* Removed extra column/button to cleanup */}
                                 </tr>)

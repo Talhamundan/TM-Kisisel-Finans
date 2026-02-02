@@ -122,3 +122,19 @@ textarea:focus {
   scrollbar-width: none;
   /* Firefox */
 }
+
+/* --- YENİ TAKSİT FORMU GRID DÜZENİ --- */
+.taksit-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* Mobil: Tek sütun */
+  gap: 15px;
+  background: #f3e8ff;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+@media (min-width: 768px) {
+  .taksit-grid {
+    grid-template-columns: 1fr 1fr; /* Desktop: İki sütun */
+  }
+}

@@ -400,7 +400,7 @@ function App() {
                     filtreYatirimTuru={calculations.filtreYatirimTuru} setFiltreYatirimTuru={calculations.setFiltreYatirimTuru}
                     mevcutAylar={calculations.mevcutAylar}
                     islemSil={budgetActions.islemSil}
-                    portfoySil={investmentActions.portfoySil}
+
                     fiyatGuncelle={investmentActions.fiyatGuncelle}
                     pozisyonSil={investmentActions.pozisyonSil} // NEW PROP assigned
                     // BES Module Props

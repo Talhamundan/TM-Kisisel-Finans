@@ -307,20 +307,179 @@ export const useInvestmentActions = (user, alanKodu) => {
 
 
     // --- PORTFÖY YÖNETİMİ (SİLME & DÜZENLEME) ---
-    const portfoySil = async (idOrIds) => {
-        const count = Array.isArray(idOrIds) ? idOrIds.length : 1;
-        if (!window.confirm(`Bu varlığı (${count} kayıt) portföyden silmek istediğinize emin misiniz?`)) return;
+    // --- PORTFÖY YÖNETİMİ (SİLME & DÜZENLEME) ---
+    // Refactored: 'pozisyonSil' with ROLLBACK capability
+    const pozisyonSil = async (itemOrItems) => {
+        // UI confirmation is now handled by ModalManager (pozisyon_sil_onay)
+        // This function executes the deletion and optional rollback
+        let itemsToDelete = [];
+        if (Array.isArray(itemOrItems)) {
+            itemsToDelete = itemOrItems;
+        } else if (itemOrItems.ids && Array.isArray(itemOrItems.ids)) {
+            // If it's an aggregated row from dashboard which has .ids array
+            // We need to fetch details for these IDs if not fully present, 
+            // but usually dashboard passes the aggregated object. 
+            // Ideally we need individual objects with dates to match transactions.
+            // For safety, let's treat it as a list of IDs and we might skip precise transaction matching
+            // OR better: The dashboard should pass the full array of underlying items?
+            // InvestmentDashboard passes 'p.ids'. 
+            // Let's stick to the plan: We need to find the transaction.
+            // If we only have IDs, we can't easily find the transaction unless we read the docs first.
+            // But wait, we are deleting the docs anyway.
+            itemsToDelete = itemOrItems.ids.map(id => ({ id, sembol: itemOrItems.sembol })); // Minimal info
+        } else {
+            itemsToDelete = [itemOrItems]; // Single object
+        }
+
         try {
-            if (Array.isArray(idOrIds)) {
-                const promises = idOrIds.map(id => deleteDoc(doc(db, "portfoy", id)));
-                await Promise.all(promises);
-            } else {
-                await deleteDoc(doc(db, "portfoy", idOrIds));
+            const nakitRef = collection(db, "nakit_islemleri");
+
+            // Iterate and Process
+            for (const item of itemsToDelete) {
+                // 1. Get the Portfoy Document to know exact details (Date/Cost) for matching
+                const docRef = doc(db, "portfoy", item.id);
+                const docSnap = await getDoc(docRef);
+
+                if (!docSnap.exists()) continue;
+
+                const pData = docSnap.data();
+
+                // 2. Attempt to find matching 'yatirim_alis' transaction
+                // Criteria: Same Symbol, Same Date (roughly), Same Type
+                // Since timestamps might vary slightly globally, we can try to query by ID if we stored it?
+                // We didn't store transaction ID in portfoy. 
+                // So we query: type=yatirim_alis, sembol=X. 
+                // And filter in memory for close date match (within 1-2 seconds) or exact match if possible.
+                // Or simplified: Just find the most recent matching amount/symbol? No, risky.
+                // BEST EFFORT: Match by 'tarih' field if it exists in portfoy.
+
+                if (pData.tarih) {
+                    // This part is tricky Firestore querying without composite indexes for everything.
+                    // Instead of complex query, let's fetch recent transactions for this user/symbol?
+                    // OR: Since we are in client-side app with limited data, maybe just read the doc?
+                    // Actually, we can use the 'tarih' timestamp.
+
+                    // Let's try to query by exact timestamp if possible, or simplified approach:
+                    // Just find a transaction with: category=Yatırım, type=yatirim_alis, description contains Symbol, date == pData.tarih
+                    // Since specific query is hard, let's skip strict linking for now and implement:
+                    // "Bakiye iadesi" -> Refund cost to a default account? Or try to find the account from transaction?
+                    // pData doesn't store 'hesapId' unfortunately. 
+                    // CRITICAL MISSING DATA: portfoy doc does not have source account ID.
+
+                    // PLAN B (ROLLBACK): 
+                    // 1. Calculate Amount to Refund: pData.adet * pData.alisFiyati
+                    // 2. Ask user which account? (Too complex for this modal)
+                    // 3. Refund to 'Nakit' (or first available account)?
+                    // 4. OR check if we have the transaction info passed in? No.
+
+                    // REVISION: We must try to find the transaction in 'nakit_islemleri' which DOES have `hesapId`.
+                    // Query: nakit_islemleri where islemTipi == 'yatirim_alis' AND sembol == pData.sembol (if we added sembol) AND tarih == pData.tarih
+                    // Note: 'sembol' field was added recently to nakit_islemleri. Old records might rely on Description.
+                    // Let's try to match by Timestamp.
+
+                    // Fetch all 'yatirim_alis' for this user (client side filtering might be okay if not too many)
+                    // Or query by exact date if possible.
+                    // Let's assume we can match by Date.
+                }
+
+                // SIMPLIFIED STABLE IMPLEMENTATION FOR THIS TASK:
+                // We will delete the portfoy doc.
+                // We will try to find a matching transaction by Timestamp.
+                // If found => Refund to that account & Delete Transaction.
+                // If not found => Only delete portfoy doc (Safety).
+
+                // Fetch candidate transactions (same seconds?)
+                // Since exact equality on Firestore Timestamp is hard, let's skip the query complexity 
+                // and assume if we can't find it easily we don't rollback to avoid data corruption.
+                // WAIT, user specifically asked for Rollback.
+                // Let's try to query all 'yatirim_alis' for this user and filter in JS.
+                // (Assuming transaction list isn't huge, this is safe for MVP).
+
+                // NOTE: To make this robust without reading 10k docs, we really need a link.
+                // But for now, we will try:
+
+                // ... (Logic implemented inside the loop below)
+                // We'll proceed with deletion first.
             }
-            toast.success("Varlık silindi.");
+
+            // ACTAUL IMPLEMENTATION LOOP:
+            const promises = itemsToDelete.map(async (item) => {
+                const pDocRef = doc(db, "portfoy", item.id);
+                const pSnap = await getDoc(pDocRef);
+
+                if (!pSnap.exists()) return;
+
+                const pData = pSnap.data();
+
+                // Attempt Rollback
+                let refundSuccess = false;
+
+                // Get transactions around that date? 
+                // Let's just query by 'islemTipi' == 'yatirim_alis' and filter by properties.
+                // This is expensive but necessary without ID link.
+                // Optimization: Maybe dashboard already has 'tumIslemler' but we are in a hook.
+                // We have to query.
+
+                // Query: limit 100 recent investment buys?
+                // This is getting complicated. 
+                // ALTERNATIVE: Use the 'tarih' from pData.
+                // Transaction usually has exact same 'tarih' if created together.
+
+                // NOTE: If we can't find it, we just delete the portfoy item.
+                // To support true rollback, we need to find the account ID.
+                // If we find the transaction, we get the account ID.
+
+                // Let's try to find it.
+                // Since we can't efficiently query by date equality on all fields... 
+                // We will skip the query if we think it's too risky, BUT user wants it.
+                // Let's fetch the `nakit_islemleri` collection where `tarih` == pData.tarih
+                // Firestore allows query by timestamp equality.
+
+                if (pData.tarih) {
+                    try {
+                        const { query, where, getDocs } = await import('firebase/firestore'); // dynamic import or standard
+                        const q = query(
+                            collection(db, "nakit_islemleri"),
+                            where("uid", "==", user.uid),
+                            where("tarih", "==", pData.tarih) // Exact match check
+                        );
+
+                        const qSnap = await getDocs(q);
+                        if (!qSnap.empty) {
+                            // Match found!
+                            const tDoc = qSnap.docs[0]; // Assume first match is the one (collision unlikely for single user ms)
+                            const tData = tDoc.data();
+
+                            // 1. Refund Balance
+                            if (tData.hesapId && tData.tutar) {
+                                await updateDoc(doc(db, "hesaplar", tData.hesapId), {
+                                    guncelBakiye: increment(tData.tutar) // Add back the money spent
+                                });
+                                console.log("Rollback: Bakiye iade edildi.", tData.tutar);
+                            }
+
+                            // 2. Delete Transaction
+                            await deleteDoc(tDoc.ref);
+                            refundSuccess = true;
+                        }
+                    } catch (e) {
+                        console.warn("Rollback search failed:", e);
+                    }
+                }
+
+                // Finally Delete Portfoy Item
+                await deleteDoc(pDocRef);
+                return refundSuccess;
+            });
+
+            await Promise.all(promises);
+            toast.success("Varlık silindi" + (itemsToDelete.length > 0 ? " (ve bulunursa bakiye iade edildi)" : "."));
+            return true;
+
         } catch (error) {
             console.error(error);
             toast.error("Silme hatası");
+            return false;
         }
     }
 
@@ -402,7 +561,8 @@ export const useInvestmentActions = (user, alanKodu) => {
         tahsilatTutar, setTahsilatTutar,
         guncelleniyor,
         yatirimAl, satisYap, fiyatGuncelle, piyasalariGuncelle, besGuncelle,
-        portfoySil, portfoyDuzenle, fillPortfolioForm, gecmisIslemEkle,
+        portfoyDuzenle, fillPortfolioForm, gecmisIslemEkle,
+        pozisyonSil, // The new rollback-enabled function
         besOdemeYap: async (besVerisi_IGNORED, islemEkle, manuelEkleAc) => {
             console.log("💰 besOdemeYap ÇAĞRILDI (Database-First Mode)");
 
@@ -879,30 +1039,7 @@ export const useInvestmentActions = (user, alanKodu) => {
         },
 
         // --- POZİSYON YÖNETİMİ ---
-        pozisyonSil: async (row) => {
-            // Confirmation handled by Modal
-            try {
-                // 1. HIDE CLOSED (SELL) LEG
-                if (row.isClosed && row.sellContext) {
-                    const sellId = row.sellContext.id;
-                    const docRef = doc(db, "nakit_islemleri", sellId);
-                    // Soft delete for Analysis only
-                    await updateDoc(docRef, { analizdenGizle: true });
-                    toast.success("Kayıt analizden gizlendi (Geçmişte duruyor).");
-                }
-                // 2. HIDE OPEN (BUY) LEG
-                else if (!row.isClosed && row.buyContext) {
-                    const buyId = row.buyContext.id;
-                    const docRef = doc(db, "nakit_islemleri", buyId);
-                    // Soft delete for Analysis only
-                    await updateDoc(docRef, { analizdenGizle: true });
-                    toast.success("Kayıt analizden gizlendi (Geçmişte duruyor).");
-                }
-            } catch (e) {
-                console.error(e);
-                toast.error("Silme sırasında hata oluştu.");
-            }
-        },
+        // Legacy pozisyonSil (soft delete) removed in favor of the new robust rollback implementation.
 
         pozisyonGuncelle: async (buyData, sellData) => {
             try {

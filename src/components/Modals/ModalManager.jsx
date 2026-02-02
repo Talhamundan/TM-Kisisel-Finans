@@ -674,27 +674,44 @@ const ModalManager = ({
 
     // NEW DELETE CONFIRMATION MODAL
     else if (aktifModal === 'pozisyon_sil_onay') {
-        title = "Pozisyon Sil";
+        title = "Pozisyonu Sil";
         icon = "🗑️";
+        const assetName = seciliVeri?.row?.sembol || "Bu varlığı";
+
         content = (
             <div>
-                <div style={{ marginBottom: '25px', padding: '15px', background: '#fee2e2', borderRadius: '12px', color: '#991b1b', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '24px' }}>⚠️</span>
-                    <div>
-                        <strong>Bu pozisyon silinecek!</strong>
-                        <div style={{ fontSize: '13px', marginTop: '5px' }}>İşlem geri alınamaz. İlgili tutar bakiyenize yansıtılacaktır. (<b>{seciliVeri?.row?.sembol}</b>)</div>
+                <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+                    <div style={{ fontSize: '16px', color: '#4a5568', marginBottom: '10px' }}>
+                        <b>{assetName}</b> varlığını portföyden silmek istediğinize emin misiniz?
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#718096' }}>
+                        Bu işlem geri alınamaz. Eğer ilgili bir harcama kaydı bulunursa, tutar bakiyenize iade edilecektir.
                     </div>
                 </div>
+
                 <div style={{ display: 'flex', gap: '15px' }}>
-                    <button onClick={close} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', color: '#334155', fontWeight: 'bold', cursor: 'pointer' }}>İPTAL</button>
-                    <button onClick={async () => {
-                        if (pozisyonSil && seciliVeri?.row) {
-                            const success = await pozisyonSil(seciliVeri.row);
-                            if (success !== false) close(); // close if success (undefined or true)
-                        } else {
-                            close();
-                        }
-                    }} style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#ef4444', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>SİL</button>
+                    <button
+                        onClick={close}
+                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#e2e8f0', color: '#4a5568', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' }}
+                    >
+                        İPTAL
+                    </button>
+                    <button
+                        onClick={async () => {
+                            if (pozisyonSil && seciliVeri?.row) {
+                                setIsProcessing(true);
+                                const success = await pozisyonSil(seciliVeri.row);
+                                setIsProcessing(false);
+                                if (success !== false) close();
+                            } else {
+                                close();
+                            }
+                        }}
+                        disabled={isProcessing}
+                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#e53e3e', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px', opacity: isProcessing ? 0.7 : 1 }}
+                    >
+                        {isProcessing ? 'SİLİNİYOR...' : 'SİL'}
+                    </button>
                 </div>
             </div>
         );
