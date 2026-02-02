@@ -29,6 +29,7 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const [transferKaynakId, setTransferKaynakId] = useState("");
     const [transferHedefId, setTransferHedefId] = useState("");
     const [transferTutar, setTransferTutar] = useState("");
+    const [transferUcreti, setTransferUcreti] = useState(""); // NEW: Transfer Fee
     const [transferTarihi, setTransferTarihi] = useState("");
 
     // Abonelik
@@ -291,6 +292,8 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
                 return false;
             }
             const tutar = parseFloat(transferTutar);
+            const ucret = parseFloat(transferUcreti) || 0; // Fee
+
             if (!transferTutar || isNaN(tutar) || tutar <= 0) {
                 toast.error("Geçerli bir transfer tutarı girin.");
                 return false;
@@ -300,16 +303,35 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
             const h = hesaplar.find(h => h.id === transferHedefId);
             const tarih = transferTarihi ? new Date(transferTarihi) : new Date();
 
+            // 1. Transfer Logic (Money Moved)
             await addDoc(collection(db, "nakit_islemleri"), {
                 uid: user.uid, alanKodu, islemTipi: "transfer", kategori: "Transfer",
-                tutar: tutar, aciklama: `${k?.hesapAdi} ➝ ${h?.hesapAdi}`,
+                tutar: tutar, aciklama: `${k?.hesapAdi} ➝ ${h?.hesapAdi}` + (ucret > 0 ? ` (+${formatCurrencyPlain(ucret)} Komisyon)` : ""),
                 tarih: tarih, kaynakId: transferKaynakId, hedefId: transferHedefId
             });
-            await updateDoc(doc(db, "hesaplar", transferKaynakId), { guncelBakiye: increment(-tutar) });
+
+            // 2. Fee Logic (Extra Expense)
+            if (ucret > 0) {
+                await addDoc(collection(db, "nakit_islemleri"), {
+                    uid: user.uid,
+                    alanKodu,
+                    hesapId: transferKaynakId, // Fee deducted from Source
+                    islemTipi: "gider",
+                    kategori: "Banka Komisyonu",
+                    tutar: ucret,
+                    aciklama: `Transfer Ücreti (${k?.hesapAdi} ➝ ${h?.hesapAdi})`,
+                    tarih: tarih
+                });
+            }
+
+            // 3. Update Balances
+            // Source: Deduct Tutar AND Fee
+            await updateDoc(doc(db, "hesaplar", transferKaynakId), { guncelBakiye: increment(-(tutar + ucret)) });
+            // Target: Add Tutar only
             await updateDoc(doc(db, "hesaplar", transferHedefId), { guncelBakiye: increment(tutar) });
 
-            toast.success("Transfer Başarılı!");
-            setTransferTutar(""); setTransferKaynakId(""); setTransferHedefId(""); setTransferTarihi("");
+            toast.success("Transfer (ve varsa ücret) işlendi!");
+            setTransferTutar(""); setTransferUcreti(""); setTransferKaynakId(""); setTransferHedefId(""); setTransferTarihi("");
             return true;
         } catch (err) {
             console.error(err);
@@ -733,7 +755,7 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         hesapAdi, setHesapAdi, hesapTipi, setHesapTipi, baslangicBakiye, setBaslangicBakiye, hesapKesimGunu, setHesapKesimGunu,
         secilenHesapId, setSecilenHesapId, islemTutar, setIslemTutar, islemAciklama, setIslemAciklama, islemTipi, setIslemTipi, kategori, setKategori, islemTarihi, setIslemTarihi,
         islemAdet, setIslemAdet, islemBirimFiyat, setIslemBirimFiyat, // Return new states
-        transferKaynakId, setTransferKaynakId, transferHedefId, setTransferHedefId, transferTutar, setTransferTutar, transferTarihi, setTransferTarihi,
+        transferKaynakId, setTransferKaynakId, transferHedefId, setTransferHedefId, transferTutar, setTransferTutar, transferUcreti, setTransferUcreti, transferTarihi, setTransferTarihi,
         aboAd, setAboAd, aboTutar, setAboTutar, aboGun, setAboGun, aboHesapId, setAboHesapId, aboKategori, setAboKategori,
         taksitBaslik, setTaksitBaslik, taksitToplamTutar, setTaksitToplamTutar, taksitSayisi, setTaksitSayisi, taksitHesapId, setTaksitHesapId, taksitKategori, setTaksitKategori, taksitAlisTarihi, setTaksitAlisTarihi,
         maasAd, setMaasAd, maasTutar, setMaasTutar, maasGun, setMaasGun, maasHesapId, setMaasHesapId,

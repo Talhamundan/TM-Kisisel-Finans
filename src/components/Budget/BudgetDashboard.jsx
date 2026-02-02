@@ -66,6 +66,7 @@ const BudgetDashboard = ({
     transferKaynakId, setTransferKaynakId,
     transferHedefId, setTransferHedefId,
     transferTutar, setTransferTutar,
+    transferUcreti, setTransferUcreti,
     transferTarihi, setTransferTarihi,
     taksitBaslik, setTaksitBaslik,
     taksitHesapId, setTaksitHesapId,
@@ -368,7 +369,11 @@ const BudgetDashboard = ({
                             <form onSubmit={transferYap} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', background: '#ebf8ff', padding: '20px', borderRadius: '10px' }}>
                                 <div><label style={{ fontSize: '12px', color: '#2b6cb0' }}>Nereden?</label><select value={transferKaynakId} onChange={e => setTransferKaynakId(e.target.value)} style={{ ...inputStyle }}><option value="">Seçiniz...</option>{(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select></div>
                                 <div><label style={{ fontSize: '12px', color: '#2b6cb0' }}>Nereye?</label><select value={transferHedefId} onChange={e => setTransferHedefId(e.target.value)} style={{ ...inputStyle }}><option value="">Seçiniz...</option>{(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}</select></div>
-                                <input type="number" placeholder="Tutar (₺)" value={transferTutar} onChange={e => setTransferTutar(e.target.value)} style={{ gridColumn: 'span 2', ...inputStyle }} />
+
+                                {/* 2. SATIR: İŞLEM TUTARI ve TRANSFER ÜCRETİ (YAN YANA) */}
+                                <input type="number" placeholder="İşlem Tutarı (₺)" value={transferTutar} onChange={e => setTransferTutar(e.target.value)} style={{ ...inputStyle }} />
+                                <input type="number" placeholder="Ücret (Opsiyonel)" value={transferUcreti} onChange={e => setTransferUcreti(e.target.value)} style={{ ...inputStyle }} />
+
                                 <input type="datetime-local" value={transferTarihi} onChange={e => setTransferTarihi(e.target.value)} style={{ gridColumn: 'span 2', ...inputStyle }} />
                                 <button type="submit" style={{ gridColumn: 'span 2', padding: '15px', background: '#3182ce', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>TRANSFER YAP / BORÇ ÖDE</button>
                             </form>

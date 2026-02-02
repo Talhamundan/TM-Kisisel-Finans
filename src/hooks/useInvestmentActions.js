@@ -99,6 +99,99 @@ export const useInvestmentActions = (user, alanKodu) => {
         return true;
     }
 
+    const gecmisIslemEkle = async ({ sembol, adet, alisFiyati, alisTarihi, satisFiyati, satisTarihi }) => {
+        if (!alanKodu) return;
+        try {
+            const sAdet = parseFloat(adet);
+            const sAlisFiyat = parseFloat(alisFiyati);
+            const sSatisFiyat = satisFiyati ? parseFloat(satisFiyati) : null;
+            const alisDate = new Date(alisTarihi);
+            const satisDate = satisTarihi ? new Date(satisTarihi) : null;
+
+            if (isNaN(sAdet) || isNaN(sAlisFiyat)) {
+                toast.error("Geçersiz değerler.");
+                return false;
+            }
+
+            // 1. KAPANMIŞ POZİSYON (Alış & Satış girilmiş - VEYA sadece Satış Fiyatı girilmiş)
+            // Kullanıcı Satış Tarihi'ni kaldırmak istedi. Eğer Satış Fiyatı varsa, kapalı pozisyon olarak işlem yapılır.
+            if (sSatisFiyat) {
+                const effectiveSatisDate = satisDate || alisDate; // Satış Tarihi yoksa Alış Tarihi varsayılan alınır
+
+                // Geçmişe yönelik ALIŞ kaydı ekle
+                await addDoc(collection(db, "nakit_islemleri"), {
+                    uid: user.uid,
+                    alanKodu,
+                    islemTipi: "yatirim_alis",
+                    kategori: "Yatırım",
+                    yatirimTuru: "Geçmiş",
+                    tutar: sAdet * sAlisFiyat,
+                    adet: sAdet,
+                    birimFiyat: sAlisFiyat,
+                    aciklama: `${sembol.toUpperCase()} Alış (Geçmiş)`,
+                    tarih: alisDate,
+                    isHistorical: true, // Geçmiş işlem olduğunu belirten bayrak
+                    sembol: sembol.toUpperCase() // Sembolü açıkça belirt
+                });
+
+                // Geçmişe yönelik SATIŞ kaydı ekle
+                await addDoc(collection(db, "nakit_islemleri"), {
+                    uid: user.uid,
+                    alanKodu,
+                    islemTipi: "yatirim_satis",
+                    kategori: "Yatırım",
+                    yatirimTuru: "Geçmiş",
+                    tutar: sAdet * sSatisFiyat,
+                    adet: sAdet,
+                    birimFiyat: sSatisFiyat,
+                    alisBirimFiyat: sAlisFiyat,
+                    aciklama: `${sembol.toUpperCase()} Satış (Geçmiş)`,
+                    tarih: effectiveSatisDate,
+                    isHistorical: true,
+                    sembol: sembol.toUpperCase()
+                });
+                toast.success("Geçmiş işlem (Kapanmış) eklendi.");
+            }
+            // 2. AÇIK POZİSYON (Sadece Alış girilmiş)
+            else {
+                // Portföye Ekle (Aktif Varlık)
+                await addDoc(collection(db, "portfoy"), {
+                    uid: user.uid,
+                    alanKodu,
+                    sembol: sembol.toUpperCase(),
+                    varlikTuru: "Geçmiş", // İstenirse kullanıcı girişi yapılabilir
+                    adet: sAdet,
+                    alisFiyati: sAlisFiyat,
+                    guncelFiyat: sAlisFiyat, // Başlangıçta maliyet ile aynı
+                    tarih: alisDate,
+                    isHistorical: true
+                });
+
+                // Geçmişe yönelik ALIŞ kaydı ekle
+                await addDoc(collection(db, "nakit_islemleri"), {
+                    uid: user.uid,
+                    alanKodu,
+                    islemTipi: "yatirim_alis",
+                    kategori: "Yatırım",
+                    yatirimTuru: "Geçmiş",
+                    tutar: sAdet * sAlisFiyat,
+                    adet: sAdet,
+                    birimFiyat: sAlisFiyat,
+                    aciklama: `${sembol.toUpperCase()} Alış (Geçmiş)`,
+                    tarih: alisDate,
+                    isHistorical: true,
+                    sembol: sembol.toUpperCase()
+                });
+                toast.success("Geçmiş işlem (Açık Pozisyon) eklendi.");
+            }
+            return true;
+        } catch (err) {
+            console.error(err);
+            toast.error("Hata: " + err.message);
+            return false;
+        }
+    }
+
     const fiyatGuncelle = async (id, yeniFiyat) => { if (!yeniFiyat) return; await updateDoc(doc(db, "portfoy", id), { guncelFiyat: parseFloat(yeniFiyat) }); }
 
     const piyasalariGuncelle = async (portfoy) => {
@@ -309,7 +402,7 @@ export const useInvestmentActions = (user, alanKodu) => {
         tahsilatTutar, setTahsilatTutar,
         guncelleniyor,
         yatirimAl, satisYap, fiyatGuncelle, piyasalariGuncelle, besGuncelle,
-        portfoySil, portfoyDuzenle, fillPortfolioForm,
+        portfoySil, portfoyDuzenle, fillPortfolioForm, gecmisIslemEkle,
         besOdemeYap: async (besVerisi_IGNORED, islemEkle, manuelEkleAc) => {
             console.log("💰 besOdemeYap ÇAĞRILDI (Database-First Mode)");
 

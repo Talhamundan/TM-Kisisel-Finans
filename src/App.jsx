@@ -239,6 +239,7 @@ function App() {
                 hesapEkle={budgetActions.hesapEkle}
                 faturaTanimEkle={budgetActions.faturaTanimEkle}
                 abonelikEkle={budgetActions.abonelikEkle}
+                gecmisIslemEkle={investmentActions.gecmisIslemEkle}
             />
 
             <Header
@@ -347,6 +348,7 @@ function App() {
                     transferKaynakId={budgetActions.transferKaynakId} setTransferKaynakId={budgetActions.setTransferKaynakId}
                     transferHedefId={budgetActions.transferHedefId} setTransferHedefId={budgetActions.setTransferHedefId}
                     transferTutar={budgetActions.transferTutar} setTransferTutar={budgetActions.setTransferTutar}
+                    transferUcreti={budgetActions.transferUcreti} setTransferUcreti={budgetActions.setTransferUcreti}
                     transferTarihi={budgetActions.transferTarihi} setTransferTarihi={budgetActions.setTransferTarihi}
                     taksitBaslik={budgetActions.taksitBaslik} setTaksitBaslik={budgetActions.setTaksitBaslik}
                     taksitHesapId={budgetActions.taksitHesapId} setTaksitHesapId={budgetActions.setTaksitHesapId}

@@ -549,10 +549,30 @@ const PortfolioAnalysisTable = ({ tumIslemler, formatPara, modalAc, pozisyonSil,
         <div style={{ background: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 10px 30px rgba(0,0,0,0.06)', border: '1px solid rgba(255,255,255,0.8)', marginTop: '30px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h3 style={{ margin: 0, color: '#2d3748' }}>📊 Portföy İşlem Analiz (Pozisyon Bazlı)</h3>
-                <div style={{ background: analysisData.totalRealizedProfit >= 0 ? '#f0fff4' : '#fff5f5', padding: '10px 20px', borderRadius: '10px', border: `1px solid ${analysisData.totalRealizedProfit >= 0 ? '#c6f6d5' : '#fed7d7'}` }}>
-                    <div style={{ fontSize: '12px', color: '#718096', fontWeight: 'bold' }}>TOPLAM REALİZE KAR</div>
-                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: analysisData.totalRealizedProfit >= 0 ? 'green' : '#e53e3e' }}>
-                        {analysisData.totalRealizedProfit > 0 ? '+' : ''}{formatPara(analysisData.totalRealizedProfit)}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <button
+                        onClick={() => modalAc('gecmis_islem_ekle')}
+                        style={{
+                            background: '#718096',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 15px',
+                            borderRadius: '10px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                        }}
+                    >
+                        <span style={{ fontSize: '16px', lineHeight: '1' }}>+</span> Geçmiş İşlem Ekle
+                    </button>
+                    <div style={{ background: analysisData.totalRealizedProfit >= 0 ? '#f0fff4' : '#fff5f5', padding: '10px 20px', borderRadius: '10px', border: `1px solid ${analysisData.totalRealizedProfit >= 0 ? '#c6f6d5' : '#fed7d7'}` }}>
+                        <div style={{ fontSize: '12px', color: '#718096', fontWeight: 'bold' }}>TOPLAM REALİZE KAR</div>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: analysisData.totalRealizedProfit >= 0 ? 'green' : '#e53e3e' }}>
+                            {analysisData.totalRealizedProfit > 0 ? '+' : ''}{formatPara(analysisData.totalRealizedProfit)}
+                        </div>
                     </div>
                 </div>
             </div>

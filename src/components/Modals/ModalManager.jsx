@@ -178,7 +178,7 @@ const ModalManager = ({
     onConfirmLogout,
 
     // ADDED: New props for add actions (Already passed, but ensuring they are destructured if not)
-    maasEkle, hesapEkle, faturaTanimEkle, abonelikEkle
+    maasEkle, hesapEkle, faturaTanimEkle, abonelikEkle, gecmisIslemEkle
 }) => {
 
     const [yeniKategoriAdi, setYeniKategoriAdi] = useState("");
@@ -602,6 +602,73 @@ const ModalManager = ({
                 close={close}
                 inputStyle={inputStyle}
             />
+        );
+    }
+
+    else if (aktifModal === 'gecmis_islem_ekle') {
+        title = "Geçmiş İşlem Ekle";
+        icon = "🕰️";
+        content = (
+            <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+
+                // Add validation
+                if (!data.sembol || !data.adet || !data.alisFiyati || !data.alisTarihi) {
+                    alert("Lütfen zorunlu alanları doldurun (Sembol, Adet, Alış Fiyatı, Alış Tarihi).");
+                    return;
+                }
+
+                const success = await gecmisIslemEkle(data);
+                if (success) close();
+            }}>
+                <div style={{ marginBottom: '15px', background: '#e2e8f0', padding: '10px', borderRadius: '8px', fontSize: '12px', color: '#4a5568' }}>
+                    ℹ️ <b>Bilgi:</b> Bu işlem nakit bakiyenizi etkilemez. Sadece analiz tablosuna ve portföye eklenir. <br />
+                    • Hem Alış hem Satış girerseniz: <b>Kapanmış Pozisyon</b> olur.<br />
+                    • Sadece Alış girerseniz: <b>Açık Pozisyon</b> olur.
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#4a5568' }}>Varlık (Hisse/Döviz)</label>
+                        <input name="sembol" placeholder="Örn: THYAO, USD" style={inputStyle} required />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#4a5568' }}>Adet</label>
+                        <input name="adet" type="number" step="0.001" placeholder="0" style={inputStyle} required />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#2b6cb0' }}>Alış Fiyatı</label>
+                        <input name="alisFiyati" type="number" step="0.01" placeholder="0.00" style={{ ...inputStyle, borderColor: '#63b3ed' }} required />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#2b6cb0' }}>Alış Tarihi</label>
+                        <input name="alisTarihi" type="date" style={{ ...inputStyle, borderColor: '#63b3ed' }} required />
+                    </div>
+                </div>
+
+                <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e0', margin: '20px 0' }} />
+
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#c53030' }}>Satış Fiyatı (Opsiyonel)</label>
+                        <input name="satisFiyati" type="number" step="0.01" placeholder="0.00" style={{ ...inputStyle, borderColor: '#fc8181' }} />
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#718096', fontStyle: 'italic' }}>
+                            * Satış fiyatı girilirse pozisyon <b>Kapanmış</b> sayılır.
+                        </span>
+                    </div>
+                </div>
+
+                <button type="submit" style={{ width: '100%', background: '#4a5568', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    GEÇMİŞ İŞLEMİ KAYDET
+                </button>
+            </form>
         );
     }
 
