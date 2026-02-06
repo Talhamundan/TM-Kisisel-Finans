@@ -178,12 +178,17 @@ const ModalManager = ({
     onConfirmLogout,
 
     // ADDED: New props for add actions (Already passed, but ensuring they are destructured if not)
-    maasEkle, hesapEkle, faturaTanimEkle, abonelikEkle, gecmisIslemEkle
+    maasEkle, hesapEkle, faturaTanimEkle, abonelikEkle, gecmisIslemEkle,
+    feedbackActions // NEW
 }) => {
+
+    // Convert props to object for inner components if needed, or just use directly
+    const props = { feedbackActions }; // Quick hack to support the previous edit which used props.feedbackActions
 
     const [yeniKategoriAdi, setYeniKategoriAdi] = useState("");
     const [yeniYatirimTuruAdi, setYeniYatirimTuruAdi] = useState("");
     const [isProcessing, setIsProcessing] = useState(false); // NEW: Global loading state for modals
+    const [silinecekObje, setSilinecekObje] = useState(null); // Local state for delete confirmation
 
     const formatPara = (tutar) => gizliMod ? "**** ₺" : formatCurrencyPlain(tutar);
 
@@ -257,6 +262,63 @@ const ModalManager = ({
                 <input placeholder="Kurum" value={tanimKurum} onChange={e => setTanimKurum(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
                 <input placeholder="Abone No" value={tanimAboneNo} onChange={e => setTanimAboneNo(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
                 <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#4a5568', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'KAYDEDİLİYOR...' : 'KAYDET'}</button>
+            </form>
+        );
+    }
+
+    else if (aktifModal === 'fatura_ode') {
+        title = "Fatura Öde";
+        icon = "💸";
+        const tanim = tanimliFaturalar?.find(t => t.id === seciliVeri?.tanimId);
+        const baslik = tanim ? tanim.baslik : "Fatura";
+
+        content = (
+            <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!secilenHesapId) { alert("Lütfen hesap seçiniz."); return; }
+                setIsProcessing(true);
+                const success = await faturaOde(seciliVeri, secilenHesapId);
+                setIsProcessing(false);
+                if (success) close();
+            }}>
+                <div style={{ marginBottom: '20px', padding: '15px', background: '#fff5f5', borderRadius: '12px', color: '#c53030' }}>
+                    <h3 style={{ margin: '0 0 5px 0' }}>{baslik}</h3>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{formatPara(seciliVeri?.tutar)}</div>
+                    <div style={{ fontSize: '12px', marginTop: '5px' }}>Son Ödeme: {tarihSadeceGunAyYil(seciliVeri?.sonOdemeTarihi)}</div>
+                </div>
+
+                <select value={secilenHesapId} onChange={e => setSecilenHesapId(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} required>
+                    <option value="">Ödenecek Hesap Seçin</option>
+                    {hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({formatPara(h.guncelBakiye)})</option>)}
+                </select>
+
+                <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#c53030', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>
+                    {isProcessing ? 'ÖDENİYOR...' : 'ÖDE'}
+                </button>
+            </form>
+        );
+    }
+
+    else if (aktifModal === 'duzenle_fatura_tanim') {
+        title = "Fatura Tanımı Düzenle";
+        content = (
+            <form onSubmit={(e) => faturaTanimDuzenle(e, seciliVeri.id).then(res => res && close())}>
+                <input placeholder="Başlık" value={tanimBaslik} onChange={e => setTanimBaslik(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <input placeholder="Kurum" value={tanimKurum} onChange={e => setTanimKurum(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
+                <input placeholder="Abone No" value={tanimAboneNo} onChange={e => setTanimAboneNo(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
+                <button type="submit" style={{ width: '100%', background: '#4a5568', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>GÜNCELLE</button>
+            </form>
+        );
+    }
+
+    else if (aktifModal === 'duzenle_bekleyen_fatura') {
+        title = "Bekleyen Fatura Düzenle";
+        content = (
+            <form onSubmit={(e) => bekleyenFaturaDuzenle(e, seciliVeri.id).then(res => res && close())}>
+                <input type="number" placeholder="Tutar" value={faturaGirisTutar} onChange={e => setFaturaGirisTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <input type="date" value={faturaGirisTarih} onChange={e => setFaturaGirisTarih(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <input placeholder="Açıklama (Opsiyonel)" value={faturaGirisAciklama} onChange={e => setFaturaGirisAciklama(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
+                <button type="submit" style={{ width: '100%', background: '#c53030', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>KAYDET</button>
             </form>
         );
     }
@@ -420,15 +482,94 @@ const ModalManager = ({
     else if (aktifModal === 'ayarlar_yonetim') {
         title = "Ayarlar";
         icon = "⚙️";
+
         content = (
-            <div>
+            <div style={{ position: 'relative' }}> {/* Konteyner relative yapıldı */}
+
+                {/* SİLME ONAY OVERLAY */}
+                {silinecekObje && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(255, 255, 255, 0.9)', // Hafif transparan beyaz arka plan
+                        backdropFilter: 'blur(4px)', // Modern blur efekti
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 10,
+                        borderRadius: '8px'
+                    }}>
+                        <div style={{ textAlign: 'center', marginBottom: '25px', padding: '0 20px' }}>
+                            <div style={{ fontSize: '18px', marginBottom: '10px' }}>🗑️</div>
+                            <div style={{ fontSize: '16px', color: '#4a5568', marginBottom: '10px' }}>
+                                <b>{silinecekObje.name}</b> {silinecekObje.type === 'kategori' ? 'kategorisini' : 'türünü'} silmek istediğinize emin misiniz?
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#718096' }}>
+                                Geçmiş veriler korunacak, sadece listeden kalkacaktır.
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '15px', width: '80%' }}>
+                            <button
+                                onClick={() => setSilinecekObje(null)}
+                                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                                İPTAL
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (silinecekObje.type === 'kategori') {
+                                        onKategoriUpdate(kategoriListesi.filter(x => x !== silinecekObje.name));
+                                    } else {
+                                        onYatirimTuruUpdate(yatirimTurleri.filter(x => x !== silinecekObje.name));
+                                    }
+                                    setSilinecekObje(null);
+                                    toast.success("Başarıyla silindi");
+                                }}
+                                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#e53e3e', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                                SİL
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* NORMAL İÇERİK (Her zaman render edilir) */}
                 <h4>📂 Bütçe Kategorileri</h4>
-                <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>{kategoriListesi.map(k => (<li key={k} style={{ background: '#f0fff4', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>{k} <span onClick={() => { if (window.confirm("Silinsin mi?")) { onKategoriUpdate(kategoriListesi.filter(x => x !== k)); } }} style={{ color: 'red', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}>X</span></li>))}</ul>
+                <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    {kategoriListesi.map(k => (
+                        <li key={k} style={{ background: '#f0fff4', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>
+                            {k}
+                            <span
+                                onClick={() => setSilinecekObje({ type: 'kategori', name: k })}
+                                style={{ color: 'red', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}
+                            >
+                                X
+                            </span>
+                        </li>
+                    ))}
+                </ul>
                 <form onSubmit={(e) => { e.preventDefault(); if (!yeniKategoriAdi) return; onKategoriUpdate([...kategoriListesi, yeniKategoriAdi]); setYeniKategoriAdi(""); toast.success("Kategori eklendi"); }} style={{ display: 'flex', gap: '5px', marginTop: '10px' }}><input value={yeniKategoriAdi} onChange={e => setYeniKategoriAdi(e.target.value)} placeholder="Yeni Kategori" style={{ flex: 1, ...inputStyle }} /><button type="submit" style={{ background: 'green', color: 'white', border: 'none', padding: '8px', borderRadius: '5px' }}>Ekle</button></form>
 
                 <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '20px 0' }} />
                 <h4>💎 Yatırım Türleri</h4>
-                <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>{(yatirimTurleri || []).map(k => (<li key={k} style={{ background: '#ebf8ff', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>{k} <span onClick={() => { if (window.confirm("Silinsin mi?")) { onYatirimTuruUpdate(yatirimTurleri.filter(x => x !== k)); } }} style={{ color: 'red', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}>X</span></li>))}</ul>
+                <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    {(yatirimTurleri || []).map(k => (
+                        <li key={k} style={{ background: '#ebf8ff', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>
+                            {k}
+                            <span
+                                onClick={() => setSilinecekObje({ type: 'yatirim', name: k })}
+                                style={{ color: 'red', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}
+                            >
+                                X
+                            </span>
+                        </li>
+                    ))}
+                </ul>
                 <form onSubmit={(e) => { e.preventDefault(); if (!yeniYatirimTuruAdi) return; onYatirimTuruUpdate([...yatirimTurleri, yeniYatirimTuruAdi]); setYeniYatirimTuruAdi(""); toast.success("Tür eklendi"); }} style={{ display: 'flex', gap: '5px', marginTop: '10px' }}><input value={yeniYatirimTuruAdi} onChange={e => setYeniYatirimTuruAdi(e.target.value)} placeholder="Yeni Tür (Fon, Coin...)" style={{ flex: 1, ...inputStyle }} /><button type="submit" style={{ background: '#3182ce', color: 'white', border: 'none', padding: '8px', borderRadius: '5px' }}>Ekle</button></form>
 
                 <div style={{ marginTop: '30px', padding: '15px', background: '#fffaf0', border: '1px solid #fbd38d', borderRadius: '8px', color: '#7b341e' }}>
@@ -502,6 +643,81 @@ const ModalManager = ({
             </form>
         );
 
+    } else if (aktifModal === 'feedback_form') {
+        title = "🚀 Geliştiriciye Not Bırak";
+        icon = "";
+
+        // Local state for feedback form
+        const [fbType, setFbType] = useState('oneri');
+        const [fbMessage, setFbMessage] = useState('');
+        const [fbImage, setFbImage] = useState(null);
+
+        // Access sendFeedback from props
+        const { sendFeedback, uploading } = props.feedbackActions || {};
+
+        content = (
+            <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!fbMessage) return alert("Lütfen bir mesaj yazın.");
+                if (sendFeedback) {
+                    const success = await sendFeedback({ type: fbType, message: fbMessage }, fbImage);
+                    if (success) {
+                        setFbMessage("");
+                        setFbImage(null);
+                        close();
+                    }
+                }
+            }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', color: '#4a5568' }}>Kategori</label>
+                <select value={fbType} onChange={e => setFbType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}>
+                    <option value="hata">🚨 Hata Bildir</option>
+                    <option value="oneri">💡 Öneri</option>
+                    <option value="tesekkur">❤️ Teşekkür</option>
+                </select>
+
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', color: '#4a5568' }}>Mesajınız</label>
+                <textarea
+                    value={fbMessage}
+                    onChange={e => setFbMessage(e.target.value)}
+                    placeholder="Fikrini buraya yazabilirsin..."
+                    style={{ ...inputStyle, height: '100px', marginBottom: '15px', resize: 'vertical' }}
+                    required
+                />
+
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', color: '#4a5568' }}>Ekran Görüntüsü</label>
+                <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        onChange={e => setFbImage(e.target.files[0])}
+                        style={{ ...inputStyle, padding: '8px' }}
+                    />
+                </div>
+
+                <div style={{ marginBottom: '15px', fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center' }}>
+                    Gönderince bana mail olarak düşecek. 📧
+                </div>
+
+                <button
+                    type="submit"
+                    disabled={uploading}
+                    style={{
+                        width: '100%',
+                        background: '#ed8936', // Matches Button
+                        color: 'white',
+                        padding: '14px',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        opacity: uploading ? 0.7 : 1,
+                        cursor: uploading ? 'wait' : 'pointer'
+                    }}
+                >
+                    {uploading ? 'GÖNDERİLİYOR...' : 'GÖNDER'}
+                </button>
+            </form>
+        );
     } else if (aktifModal === 'duzenle_portfoy') {
         title = "Portföy Düzenle";
         icon = "✏️";

@@ -224,7 +224,7 @@ const BudgetDashboard = ({
                         </div>
                         <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee', textAlign: 'right', fontSize: '14px' }}>
                             <div style={{ color: '#666' }}>Nakit Varlık: <b>{formatPara(sadeceCuzdanNakiti)}</b></div>
-                            <div style={{ color: '#666' }}>+ Portföy/Yatırım/BES: <b>{formatPara(genelToplamYatirimGucu)}</b></div>
+                            <div style={{ color: '#666' }}>Yatırım: <b>{formatPara(genelToplamYatirimGucu)}</b></div>
                             <div style={{ color: '#2d3748', fontSize: '16px', marginTop: '5px' }}>NET VARLIK: <b style={{ color: netVarlik >= 0 ? 'green' : 'red' }}>{formatPara(netVarlik)}</b></div>
                         </div>
                     </div>
@@ -270,12 +270,12 @@ const BudgetDashboard = ({
                                 <span>+</span> Fatura Tanımla
                             </button>
                         </div>
-                        <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {/* Faturalar */}
                             {(tanimliFaturalar || []).map(tanim => {
                                 const bekleyen = bekleyenFaturalar.find(f => f.tanimId === tanim.id);
                                 return (
-                                    <div key={tanim.id} style={{ marginBottom: '10px', border: '1px solid #eee', borderRadius: '10px', overflow: 'hidden' }}>
+                                    <div key={tanim.id} style={{ marginBottom: '10px', border: '1px solid #eee', borderRadius: '10px', overflow: 'hidden', position: 'relative', zIndex: 10 }}>
                                         <div style={{ padding: '10px', background: '#f7fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
                                                 <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#2d3748' }}>{tanim.baslik}</div>
@@ -293,6 +293,7 @@ const BudgetDashboard = ({
                                                 <div><div style={{ fontWeight: 'bold', color: '#c53030', fontSize: '13px' }}>{formatPara(bekleyen.tutar)}</div><div style={{ fontSize: '10px', color: '#c53030' }}>Son: {tarihSadeceGunAyYil(bekleyen.sonOdemeTarihi)}</div></div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                     <span onClick={() => modalAc('duzenle_bekleyen_fatura', bekleyen)} style={{ cursor: 'pointer', fontSize: '12px' }}>✏️</span>
+                                                    <span onClick={() => normalSil("bekleyen_faturalar", bekleyen.id)} style={{ cursor: 'pointer', fontSize: '12px', color: '#e53e3e', marginRight: '5px' }}>🗑️</span>
                                                     <button onClick={() => modalAc('fatura_ode', bekleyen)} style={{ background: '#c53030', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '15px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>ÖDE</button>
                                                 </div>
                                             </div>

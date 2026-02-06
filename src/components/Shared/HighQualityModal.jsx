@@ -1,19 +1,14 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 
 /**
  * A reusable, high-quality modal component.
- * 
- * @param {boolean} isOpen - Controls visibility.
- * @param {function} onClose - Function to close the modal.
- * @param {string} title - The title of the modal.
- * @param {string|React.Node} icon - Emoji or Icon component to display next to title.
- * @param {React.Node} children - The form or content of the modal.
- * @param {React.Node} footerButtons - Optional buttons to render at the bottom.
+ * Uses Portal to render at document.body level to avoid z-index/overflow issues.
  */
 const HighQualityModal = ({ isOpen, onClose, title, icon, children, footerButtons }) => {
     if (!isOpen) return null;
 
-    return (
+    return ReactDOM.createPortal(
         <div
             style={{
                 position: 'fixed',
@@ -21,14 +16,14 @@ const HighQualityModal = ({ isOpen, onClose, title, icon, children, footerButton
                 left: 0,
                 width: '100%',
                 height: '100%',
-                background: 'rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(4px)',
+                background: 'rgba(0,0,0,0.6)', // Slightly darker for better contrast
+                backdropFilter: 'blur(5px)',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
-                zIndex: 9999
+                zIndex: 99999 // Ultra high z-index
             }}
-            onClick={onClose} // Close when clicking overlay
+            onClick={onClose}
         >
             <div
                 style={{
@@ -37,13 +32,14 @@ const HighQualityModal = ({ isOpen, onClose, title, icon, children, footerButton
                     maxHeight: '90vh',
                     overflowY: 'auto',
                     borderRadius: '16px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                    border: '1px solid rgba(255,255,255,0.2)',
                     display: 'flex',
                     flexDirection: 'column',
-                    animation: 'fadeIn 0.2s ease-out'
+                    animation: 'fadeIn 0.25s ease-out',
+                    position: 'relative' // Ensure relative content context
                 }}
-                onClick={e => e.stopPropagation()} // Prevent close when clicking content
+                onClick={e => e.stopPropagation()}
             >
                 {/* HEADER */}
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -73,11 +69,12 @@ const HighQualityModal = ({ isOpen, onClose, title, icon, children, footerButton
             </div>
             <style>{`
                 @keyframes fadeIn {
-                    from { opacity: 0; transform: scale(0.95); }
-                    to { opacity: 1; transform: scale(1); }
+                    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
                 }
             `}</style>
-        </div>
+        </div>,
+        document.body
     );
 };
 

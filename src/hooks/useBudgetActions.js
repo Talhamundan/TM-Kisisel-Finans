@@ -521,14 +521,19 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         try {
             const tanim = tanimliFaturalar.find(t => t.id === fatura.tanimId);
             const ad = tanim ? tanim.baslik : "Fatura";
-            const result = await Swal.fire({ title: 'Fatura Ödensin mi?', html: `${ad} (<b>${formatCurrencyPlain(fatura.tutar)}</b>) ödendi olarak işlenecek.`, icon: 'question', showCancelButton: true, confirmButtonText: 'Evet, Öde', cancelButtonText: 'İptal' });
-            if (!result.isConfirmed) return false;
 
+            // 1. İşlemi Kaydet (Gider)
             await addDoc(collection(db, "nakit_islemleri"), { uid: user.uid, alanKodu, hesapId: hesapId, islemTipi: "gider", kategori: "Fatura", tutar: fatura.tutar, aciklama: `${ad} Ödeme (${fatura.aciklama || ''})`, tarih: new Date() });
+
+            // 2. Bakiyeden Düş
             await updateDoc(doc(db, "hesaplar", hesapId), { guncelBakiye: increment(-fatura.tutar) });
+
+            // 3. Bekleyen Listesinden Sil (Tek Seferlik Ödeme)
+            // Kullanıcı her ay manuel girecek.
             await deleteDoc(doc(db, "bekleyen_faturalar", fatura.id));
 
-            toast.success("Fatura ödendi ve arşivlendi.");
+            toast.success("Fatura ödendi ve listeden kaldırıldı.");
+
             return true;
         } catch (err) { console.error(err); toast.error("Fatura ödenemedi"); return false; }
     }
