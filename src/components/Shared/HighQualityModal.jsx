@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom';
  * A reusable, high-quality modal component.
  * Uses Portal to render at document.body level to avoid z-index/overflow issues.
  */
-const HighQualityModal = ({ isOpen, onClose, title, icon, children, footerButtons }) => {
+const HighQualityModal = ({ isOpen, onClose, title, icon, children, footerButtons, width = '450px', minHeight, maxHeight = '90vh' }) => {
     if (!isOpen) return null;
 
     return ReactDOM.createPortal(
@@ -28,8 +28,9 @@ const HighQualityModal = ({ isOpen, onClose, title, icon, children, footerButton
             <div
                 style={{
                     background: 'white',
-                    width: '450px',
-                    maxHeight: '90vh',
+                    width: width,
+                    minHeight: minHeight,
+                    maxHeight: maxHeight,
                     overflowY: 'auto',
                     borderRadius: '16px',
                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',

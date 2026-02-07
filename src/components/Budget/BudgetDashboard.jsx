@@ -164,7 +164,7 @@ const BudgetDashboard = ({
                                 <span>+</span> Gelir Ekle
                             </button>
                         </div>
-                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                        <div>
                             {(maaslar || []).map(m => {
                                 const hesap = hesaplar.find(h => h.id === m.hesapId);
                                 return (
@@ -192,7 +192,8 @@ const BudgetDashboard = ({
                         </div>
                         <div style={{ marginBottom: '15px' }}>
                             {(hesaplar || []).map(h => {
-                                let toplamBakiye = parseFloat(h.guncelBakiye) || 0;
+                                let toplamBakiye = parseFloat(h.guncelBakiye);
+                                if (isNaN(toplamBakiye)) toplamBakiye = 0;
                                 let aylikFark = 0;
                                 filtrelenmisIslemler.forEach(i => {
                                     if (i.hesapId === h.id) {

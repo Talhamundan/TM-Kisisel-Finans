@@ -79,10 +79,9 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
                 toast.warning("Lütfen hesap adı giriniz.");
                 return false;
             }
-            const bakiye = parseFloat(baslangicBakiye);
+            let bakiye = parseFloat(baslangicBakiye);
             if (isNaN(bakiye)) {
-                toast.warning("Geçerli bir bakiye giriniz.");
-                return false;
+                bakiye = 0;
             }
 
             await addDoc(collection(db, "hesaplar"), {

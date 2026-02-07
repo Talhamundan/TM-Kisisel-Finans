@@ -199,6 +199,8 @@ const ModalManager = ({
     let content = null;
     let title = "Modal";
     let icon = "📝";
+    let customWidth = undefined;
+    let customMinHeight = undefined;
 
     // 0. YENİ EKLEME MODALLARI
     if (aktifModal === 'maas_ekle') {
@@ -238,7 +240,7 @@ const ModalManager = ({
                     <option value="krediKarti">Kart</option>
                     <option value="yatirim">Yatırım H.</option>
                 </select>
-                <input placeholder="Başlangıç Bakiyesi" type="number" value={baslangicBakiye} onChange={e => setBaslangicBakiye(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
+                <input placeholder="0" type="number" min="0" value={baslangicBakiye} onChange={e => setBaslangicBakiye(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
                 {hesapTipi === 'krediKarti' && <input type="number" placeholder="Kesim Günü (1-31)" value={hesapKesimGunu} onChange={e => setHesapKesimGunu(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />}
                 <button type="submit" disabled={isProcessing} style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', opacity: isProcessing ? 0.7 : 1 }}>{isProcessing ? 'KAYDEDİLİYOR...' : 'KAYDET'}</button>
             </form>
@@ -491,104 +493,82 @@ const ModalManager = ({
     }
 
     else if (aktifModal === 'ayarlar_yonetim') {
-        title = "Ayarlar";
+        title = <span style={{ fontFamily: "'Times New Roman', Times, serif" }}>Ayarlar</span>;
         icon = "⚙️";
+        customWidth = "380px";
+        customMinHeight = "550px";
+
+        const tagStyle = (bg) => ({
+            background: bg, color: '#000', padding: '4px 10px', borderRadius: '15px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${bg === '#fff' ? '#e2e8f0' : 'transparent'}`,
+            fontWeight: '500', fontFamily: "'Times New Roman', Times, serif"
+        });
 
         content = (
-            <div style={{ position: 'relative' }}> {/* Konteyner relative yapıldı */}
-
+            <div style={{ position: 'relative', fontFamily: "'Times New Roman', Times, serif" }}>
                 {/* SİLME ONAY OVERLAY */}
                 {silinecekObje && (
                     <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(255, 255, 255, 0.9)', // Hafif transparan beyaz arka plan
-                        backdropFilter: 'blur(4px)', // Modern blur efekti
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 10,
-                        borderRadius: '8px'
+                        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                        background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(5px)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                        zIndex: 20, borderRadius: '12px'
                     }}>
-                        <div style={{ textAlign: 'center', marginBottom: '25px', padding: '0 20px' }}>
-                            <div style={{ fontSize: '18px', marginBottom: '10px' }}>🗑️</div>
-                            <div style={{ fontSize: '16px', color: '#4a5568', marginBottom: '10px' }}>
-                                <b>{silinecekObje.name}</b> {silinecekObje.type === 'kategori' ? 'kategorisini' : 'türünü'} silmek istediğinize emin misiniz?
-                            </div>
-                            <div style={{ fontSize: '13px', color: '#718096' }}>
-                                Geçmiş veriler korunacak, sadece listeden kalkacaktır.
+                        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                            <div style={{ fontSize: '20px', marginBottom: '8px' }}>🗑️</div>
+                            <b style={{ color: '#2d3748', fontSize: '13px' }}>{silinecekObje.name}</b>
+                            <div style={{ color: '#718096', fontSize: '11px', marginTop: '4px' }}>
+                                {silinecekObje.type === 'kategori' ? 'kategorisini' : 'türünü'} silmek istediğinize emin misiniz?
                             </div>
                         </div>
-
-                        <div style={{ display: 'flex', gap: '15px', width: '80%' }}>
-                            <button
-                                onClick={() => setSilinecekObje(null)}
-                                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', color: '#4a5568', fontWeight: 'bold', cursor: 'pointer' }}
-                            >
-                                İPTAL
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (silinecekObje.type === 'kategori') {
-                                        onKategoriUpdate(kategoriListesi.filter(x => x !== silinecekObje.name));
-                                    } else {
-                                        onYatirimTuruUpdate(yatirimTurleri.filter(x => x !== silinecekObje.name));
-                                    }
-                                    setSilinecekObje(null);
-                                    toast.success("Başarıyla silindi");
-                                }}
-                                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#e53e3e', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
-                            >
-                                SİL
-                            </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => setSilinecekObje(null)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e0', background: 'white', color: '#4a5568', cursor: 'pointer', fontSize: '11px', fontFamily: "'Times New Roman', Times, serif" }}>İPTAL</button>
+                            <button onClick={() => {
+                                if (silinecekObje.type === 'kategori') onKategoriUpdate(kategoriListesi.filter(x => x !== silinecekObje.name));
+                                else onYatirimTuruUpdate(yatirimTurleri.filter(x => x !== silinecekObje.name));
+                                setSilinecekObje(null);
+                                toast.success("Silindi.");
+                            }} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#e53e3e', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '11px', fontFamily: "'Times New Roman', Times, serif" }}>SİL</button>
                         </div>
                     </div>
                 )}
 
-                {/* NORMAL İÇERİK (Her zaman render edilir) */}
-                <h4>📂 Bütçe Kategorileri</h4>
-                <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                    {kategoriListesi.map(k => (
-                        <li key={k} style={{ background: '#f0fff4', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>
-                            {k}
-                            <span
-                                onClick={() => setSilinecekObje({ type: 'kategori', name: k })}
-                                style={{ color: 'red', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}
-                            >
-                                X
-                            </span>
-                        </li>
+                {/* 1. KATEGORİLER */}
+                <h4 style={{ margin: '0 0 10px 0', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>📂 Kategoriler</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                    {(kategoriListesi || []).map(k => (
+                        <span key={k} style={tagStyle('#f0fff4')}>
+                            {k} <span onClick={() => setSilinecekObje({ type: 'kategori', name: k })} style={{ cursor: 'pointer', color: '#e53e3e', fontWeight: 'bold', fontSize: '12px' }}>X</span>
+                        </span>
                     ))}
-                </ul>
-                <form onSubmit={(e) => { e.preventDefault(); if (!yeniKategoriAdi) return; onKategoriUpdate([...kategoriListesi, yeniKategoriAdi]); setYeniKategoriAdi(""); toast.success("Kategori eklendi"); }} style={{ display: 'flex', gap: '5px', marginTop: '10px' }}><input value={yeniKategoriAdi} onChange={e => setYeniKategoriAdi(e.target.value)} placeholder="Yeni Kategori" style={{ flex: 1, ...inputStyle }} /><button type="submit" style={{ background: 'green', color: 'white', border: 'none', padding: '8px', borderRadius: '5px' }}>Ekle</button></form>
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); if (!yeniKategoriAdi) return; onKategoriUpdate([...(kategoriListesi || []), yeniKategoriAdi]); setYeniKategoriAdi(""); toast.success("Kategori eklendi"); }} style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                    <input value={yeniKategoriAdi} onChange={e => setYeniKategoriAdi(e.target.value)} placeholder="Yeni Kategori" style={{ ...inputStyle, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px', fontFamily: "'Times New Roman', Times, serif" }} />
+                    <button type="submit" style={{ padding: '0 16px', borderRadius: '8px', border: 'none', background: 'green', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', fontFamily: "'Times New Roman', Times, serif" }}>Ekle</button>
+                </form>
 
-                <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '20px 0' }} />
-                <h4>💎 Yatırım Türleri</h4>
-                <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {/* 2. YATIRIM TÜRLERİ */}
+                <h4 style={{ margin: '0 0 10px 0', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', opacity: 0.8 }}>💎 Yatırım Türleri</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
                     {(yatirimTurleri || []).map(k => (
-                        <li key={k} style={{ background: '#ebf8ff', padding: '5px 10px', borderRadius: '15px', fontSize: '13px' }}>
-                            {k}
-                            <span
-                                onClick={() => setSilinecekObje({ type: 'yatirim', name: k })}
-                                style={{ color: 'red', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}
-                            >
-                                X
-                            </span>
-                        </li>
+                        <span key={k} style={tagStyle('#ebf8ff')}>
+                            {k} <span onClick={() => setSilinecekObje({ type: 'yatirim', name: k })} style={{ cursor: 'pointer', color: '#e53e3e', fontWeight: 'bold', fontSize: '12px' }}>X</span>
+                        </span>
                     ))}
-                </ul>
-                <form onSubmit={(e) => { e.preventDefault(); if (!yeniYatirimTuruAdi) return; onYatirimTuruUpdate([...yatirimTurleri, yeniYatirimTuruAdi]); setYeniYatirimTuruAdi(""); toast.success("Tür eklendi"); }} style={{ display: 'flex', gap: '5px', marginTop: '10px' }}><input value={yeniYatirimTuruAdi} onChange={e => setYeniYatirimTuruAdi(e.target.value)} placeholder="Yeni Tür (Fon, Coin...)" style={{ flex: 1, ...inputStyle }} /><button type="submit" style={{ background: '#3182ce', color: 'white', border: 'none', padding: '8px', borderRadius: '5px' }}>Ekle</button></form>
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); if (!yeniYatirimTuruAdi) return; onYatirimTuruUpdate([...(yatirimTurleri || []), yeniYatirimTuruAdi]); setYeniYatirimTuruAdi(""); toast.success("Tür eklendi"); }} style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                    <input value={yeniYatirimTuruAdi} onChange={e => setYeniYatirimTuruAdi(e.target.value)} placeholder="Yeni Tür (Fon, Coin...)" style={{ ...inputStyle, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px', fontFamily: "'Times New Roman', Times, serif" }} />
+                    <button type="submit" style={{ padding: '0 16px', borderRadius: '8px', border: 'none', background: '#3182ce', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px', fontFamily: "'Times New Roman', Times, serif" }}>Ekle</button>
+                </form>
 
-                <div style={{ marginTop: '30px', padding: '15px', background: '#fffaf0', border: '1px solid #fbd38d', borderRadius: '8px', color: '#7b341e' }}>
-                    <h4 style={{ margin: '0 0 10px 0', color: '#c05621' }}>🚚 Verileri Başka Koda Taşı</h4>
-                    <p style={{ fontSize: '12px' }}>Kod: <b>{alanKodu}</b> → Yeni Kod</p>
-                    <form onSubmit={verileriTasi} style={{ display: 'flex', gap: '5px' }}>
-                        <input value={yeniKodInput} onChange={e => setYeniKodInput(e.target.value.toUpperCase())} placeholder="YENİ KOD" style={{ flex: 1, ...inputStyle, border: '1px solid #fbd38d' }} />
-                        <button type="submit" disabled={tasimaIslemiSuruyor} style={{ background: '#c05621', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' }}>{tasimaIslemiSuruyor ? '...' : 'TAŞI'}</button>
+                {/* 3. VERİ TAŞIMA */}
+                <div style={{ padding: '12px', background: '#fffaf0', border: '1px solid #fbd38d', borderRadius: '10px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#c05621', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>🚚 Verileri Başka Koda Taşı</h4>
+                    <div style={{ fontSize: '11px', marginBottom: '8px', color: '#744210' }}>
+                        Mevcut Kodunuz: <b>{alanKodu}</b>. Taşımak için yeni kodu girin.
+                    </div>
+                    <form onSubmit={verileriTasi} style={{ display: 'flex', gap: '8px' }}>
+                        <input value={yeniKodInput} onChange={e => setYeniKodInput(e.target.value.toUpperCase())} placeholder="YENİ KOD" style={{ ...inputStyle, flex: 1, border: '1px solid #fbd38d', background: 'white', fontSize: '12px', padding: '8px', fontFamily: "'Times New Roman', Times, serif" }} />
+                        <button type="submit" disabled={tasimaIslemiSuruyor} style={{ background: '#c05621', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '11px', fontFamily: "'Times New Roman', Times, serif" }}>{tasimaIslemiSuruyor ? '...' : 'TAŞI'}</button>
                     </form>
                 </div>
             </div>
@@ -899,6 +879,8 @@ const ModalManager = ({
             onClose={close}
             title={title}
             icon={icon}
+            width={customWidth}
+            minHeight={customMinHeight}
         >
             {content}
         </HighQualityModal>
