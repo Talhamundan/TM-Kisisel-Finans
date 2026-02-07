@@ -276,7 +276,15 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
 
     const normalSil = async (koleksiyon, id) => {
         Swal.fire({ title: 'Emin misin?', text: "Bu kayıt kalıcı olarak silinecek.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Evet, Sil' }).then(async (result) => {
-            if (result.isConfirmed) { await deleteDoc(doc(db, koleksiyon, id)); toast.info("Kayıt silindi."); }
+            if (result.isConfirmed) {
+                try {
+                    await deleteDoc(doc(db, koleksiyon, id));
+                    toast.info("Kayıt silindi.");
+                } catch (error) {
+                    console.error("Silme hatası:", error);
+                    toast.error("Silinirken bir hata oluştu: " + error.message);
+                }
+            }
         });
     }
 

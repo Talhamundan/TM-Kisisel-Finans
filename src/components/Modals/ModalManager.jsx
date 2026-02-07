@@ -179,11 +179,9 @@ const ModalManager = ({
 
     // ADDED: New props for add actions (Already passed, but ensuring they are destructured if not)
     maasEkle, hesapEkle, faturaTanimEkle, abonelikEkle, gecmisIslemEkle,
-    feedbackActions // NEW
+
 }) => {
 
-    // Convert props to object for inner components if needed, or just use directly
-    const props = { feedbackActions }; // Quick hack to support the previous edit which used props.feedbackActions
 
     const [yeniKategoriAdi, setYeniKategoriAdi] = useState("");
     const [yeniYatirimTuruAdi, setYeniYatirimTuruAdi] = useState("");
@@ -479,6 +477,19 @@ const ModalManager = ({
         );
     }
 
+    else if (aktifModal === 'duzenle_maas') {
+        title = "Gelir Düzenle";
+        content = (
+            <form onSubmit={(e) => maasDuzenle(e, seciliVeri.id).then(res => res && close())}>
+                <input value={maasAd} onChange={e => setMaasAd(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="Gelir Adı" />
+                <input type="number" value={maasTutar} onChange={e => setMaasTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="Tutar" />
+                <input type="number" value={maasGun} onChange={e => setMaasGun(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="Gün (1-31)" />
+                <select value={maasHesapId} onChange={e => setMaasHesapId(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }}><option value="">Hesap Seç</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi}</option>)}</select>
+                <button type="submit" style={{ width: '100%', background: '#48bb78', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>GÜNCELLE</button>
+            </form>
+        );
+    }
+
     else if (aktifModal === 'ayarlar_yonetim') {
         title = "Ayarlar";
         icon = "⚙️";
@@ -643,81 +654,7 @@ const ModalManager = ({
             </form>
         );
 
-    } else if (aktifModal === 'feedback_form') {
-        title = "🚀 Geliştiriciye Not Bırak";
-        icon = "";
 
-        // Local state for feedback form
-        const [fbType, setFbType] = useState('oneri');
-        const [fbMessage, setFbMessage] = useState('');
-        const [fbImage, setFbImage] = useState(null);
-
-        // Access sendFeedback from props
-        const { sendFeedback, uploading } = props.feedbackActions || {};
-
-        content = (
-            <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!fbMessage) return alert("Lütfen bir mesaj yazın.");
-                if (sendFeedback) {
-                    const success = await sendFeedback({ type: fbType, message: fbMessage }, fbImage);
-                    if (success) {
-                        setFbMessage("");
-                        setFbImage(null);
-                        close();
-                    }
-                }
-            }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', color: '#4a5568' }}>Kategori</label>
-                <select value={fbType} onChange={e => setFbType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}>
-                    <option value="hata">🚨 Hata Bildir</option>
-                    <option value="oneri">💡 Öneri</option>
-                    <option value="tesekkur">❤️ Teşekkür</option>
-                </select>
-
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', color: '#4a5568' }}>Mesajınız</label>
-                <textarea
-                    value={fbMessage}
-                    onChange={e => setFbMessage(e.target.value)}
-                    placeholder="Fikrini buraya yazabilirsin..."
-                    style={{ ...inputStyle, height: '100px', marginBottom: '15px', resize: 'vertical' }}
-                    required
-                />
-
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px', color: '#4a5568' }}>Ekran Görüntüsü</label>
-                <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <input
-                        type="file"
-                        accept="image/*"
-                        onChange={e => setFbImage(e.target.files[0])}
-                        style={{ ...inputStyle, padding: '8px' }}
-                    />
-                </div>
-
-                <div style={{ marginBottom: '15px', fontSize: '12px', color: '#718096', fontStyle: 'italic', textAlign: 'center' }}>
-                    Gönderince bana mail olarak düşecek. 📧
-                </div>
-
-                <button
-                    type="submit"
-                    disabled={uploading}
-                    style={{
-                        width: '100%',
-                        background: '#ed8936', // Matches Button
-                        color: 'white',
-                        padding: '14px',
-                        border: 'none',
-                        borderRadius: '12px',
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                        opacity: uploading ? 0.7 : 1,
-                        cursor: uploading ? 'wait' : 'pointer'
-                    }}
-                >
-                    {uploading ? 'GÖNDERİLİYOR...' : 'GÖNDER'}
-                </button>
-            </form>
-        );
     } else if (aktifModal === 'duzenle_portfoy') {
         title = "Portföy Düzenle";
         icon = "✏️";

@@ -18,8 +18,8 @@ import { useDataListeners } from './hooks/useDataListeners';
 import { useBudgetActions } from './hooks/useBudgetActions';
 import { useInvestmentActions } from './hooks/useInvestmentActions';
 import { useCalculations } from './hooks/useCalculations';
-import { useFeedbackActions } from './hooks/useFeedbackActions'; // NEW
-import FeedbackButton from './components/Layout/FeedbackButton'; // NEW
+import Feedback from './components/Feedback';
+
 
 // Helpers
 import { inputStyle } from './utils/helpers';
@@ -44,7 +44,7 @@ function App() {
     const calculations = useCalculations(data, gizliMod, data.aylikLimit);
     const budgetActions = useBudgetActions(user, alanKodu, data.hesaplar, data.kategoriListesi, data.tanimliFaturalar);
     const investmentActions = useInvestmentActions(user, alanKodu);
-    const feedbackActions = useFeedbackActions(user); // NEW
+
 
 
     // 3.1 GÜVENLİK VE UX İYİLEŞTİRMELERİ (Global Date Fix)
@@ -439,7 +439,7 @@ function App() {
                 satisTahsilatEkle={investmentActions.satisTahsilatEkle}
                 pozisyonGuncelle={investmentActions.pozisyonGuncelle} // NEW PROP assigned
                 pozisyonSil={investmentActions.pozisyonSil} // NEW PROP assigned
-                feedbackActions={feedbackActions} // NEW
+
                 onConfirmLogout={handleConfirmLogout}
                 // FIXED: Passing missing action props
                 maasEkle={budgetActions.maasEkle}
@@ -630,8 +630,9 @@ function App() {
                     genelToplamYatirimGucu={calculations.genelToplamYatirimGucu}
                 />
             )}
+
             {/* Geri Bildirim Butonu */}
-            <FeedbackButton onClick={() => setAktifModal('feedback_form')} />
+            <Feedback userEmail={user?.email} />
         </div>
     );
 }

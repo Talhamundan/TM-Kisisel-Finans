@@ -172,8 +172,8 @@ const BudgetDashboard = ({
                                         <div><div style={{ fontWeight: 'bold' }}>{m.ad}</div><div style={{ fontSize: '11px', color: '#999' }}>Her ayın {m.gun}. günü • {hesap?.hesapAdi}</div></div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                             <span style={{ color: 'green', fontWeight: 'bold' }}>{formatPara(m.tutar)}</span>
-                                            <span onClick={() => modalAc('duzenle_maas', m)} style={{ cursor: 'pointer', fontSize: '12px', marginLeft: '5px' }}>✏️</span>
-                                            <span onClick={() => normalSil("maaslar", m.id)} style={{ cursor: 'pointer', color: 'red', fontSize: '12px' }}>🗑️</span>
+                                            <span onClick={(e) => { e.stopPropagation(); modalAc('duzenle_maas', m); }} style={{ cursor: 'pointer', fontSize: '12px', marginLeft: '5px' }}>✏️</span>
+                                            <span onClick={(e) => { e.stopPropagation(); normalSil("maaslar", m.id); }} style={{ cursor: 'pointer', color: 'red', fontSize: '12px' }}>🗑️</span>
                                         </div>
                                     </div>
                                 )
