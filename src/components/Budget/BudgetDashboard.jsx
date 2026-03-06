@@ -93,20 +93,20 @@ const BudgetDashboard = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}> {/* Ana Container gap düzeltildi */}
 
             {/* 1. ve 2. SATIR BİRLEŞİK GRID (Yedek.js ile birebir aynı yapı) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
+            <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
 
                 {/* 1. SATIR: KARTLAR */}
-                <div style={{ ...cardStyle, borderLeft: '5px solid #48bb78' }}>
-                    <h3 style={{ margin: 0, color: '#888', fontSize: '11px', letterSpacing: '1px' }}>TOPLAM GELİR ({aktifAy})</h3>
-                    <h1 style={{ fontSize: '26px', margin: '10px 0', color: '#333' }}>{formatPara(toplamGelir)}</h1>
+                <div className="responsive-card" style={{ ...cardStyle, borderLeft: '5px solid #48bb78' }}>
+                    <h3 className="responsive-title" style={{ margin: 0, color: '#888', fontSize: '11px', letterSpacing: '1px' }}>TOPLAM GELİR ({aktifAy})</h3>
+                    <h1 className="responsive-amount" style={{ fontSize: '26px', margin: '10px 0', color: '#333' }}>{formatPara(toplamGelir)}</h1>
                 </div>
-                <div style={{ ...cardStyle, borderLeft: '5px solid #F59E0B' }}>
-                    <span style={{ color: '#888', fontSize: '11px', letterSpacing: '1px' }}>BUGÜN HARCANAN</span>
-                    <h2 style={{ color: '#333', margin: '10px 0', fontSize: '26px' }}>{formatPara(bugunGider)}</h2>
+                <div className="responsive-card" style={{ ...cardStyle, borderLeft: '5px solid #F59E0B' }}>
+                    <span className="responsive-title" style={{ color: '#888', fontSize: '11px', letterSpacing: '1px' }}>BUGÜN HARCANAN</span>
+                    <h2 className="responsive-amount" style={{ color: '#333', margin: '10px 0', fontSize: '26px' }}>{formatPara(bugunGider)}</h2>
                 </div>
-                <div style={{ ...cardStyle, borderLeft: '5px solid #f56565' }}>
-                    <span style={{ color: '#888', fontSize: '11px', letterSpacing: '1px' }}>GİDER ({aktifAy})</span>
-                    <h2 style={{ color: '#333', margin: '10px 0', fontSize: '24px' }}>{formatPara(toplamGider)}</h2>
+                <div className="responsive-card" style={{ ...cardStyle, borderLeft: '5px solid #f56565' }}>
+                    <span className="responsive-title" style={{ color: '#888', fontSize: '11px', letterSpacing: '1px' }}>GİDER ({aktifAy})</span>
+                    <h2 className="responsive-amount" style={{ color: '#333', margin: '10px 0', fontSize: '24px' }}>{formatPara(toplamGider)}</h2>
                 </div>
 
                 {/* 2. SATIR: GRAFİK (2 Sütun) ve PASTA (1 Sütun) */}
@@ -128,19 +128,19 @@ const BudgetDashboard = ({
                     )}
                 </div>
 
-                <div style={{ ...cardStyle, gridColumn: 'span 1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="responsive-card" style={{ ...cardStyle, gridColumn: 'span 1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
 
                     <ResponsiveContainer width="100%" height={250}><PieChart><Pie data={kategoriVerisi || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" label={({ name }) => name.substring(0, 10)}>{(kategoriVerisi || []).map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(value) => formatPara(value)} /></PieChart></ResponsiveContainer>
                 </div>
             </div>
 
             {/* --- ALT BÖLÜM (FORMLAR VE LİSTE) --- */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '25px' }}>
+            <div id="cuzdanlar-section" className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '25px' }}>
 
                 {/* SOL SÜTUN */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
                     {/* LİMİT */}
-                    <div style={cardStyle}>
+                    <div className="responsive-card" style={cardStyle}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                             <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>🎯 Aylık Bütçe Limiti</h4>
                             <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="number" value={aylikLimit} onChange={(e) => onLimitChange(parseInt(e.target.value))} style={{ width: '70px', border: '1px solid #ddd', borderRadius: '5px', padding: '2px', background: 'white', color: '#333' }} /></div>
@@ -157,7 +157,7 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* MAAŞ MODÜLÜ */}
-                    <div style={{ ...cardStyle, height: 'fit-content' }}>
+                    <div className="responsive-card" style={{ ...cardStyle, height: 'fit-content' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                             <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>💰 Maaşlar & Gelirler</h4>
                             <button onClick={() => modalAc('maas_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#48bb78', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
@@ -183,8 +183,8 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* HESAPLAR */}
-                    <div style={{ ...cardStyle, height: 'fit-content' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <div className="responsive-card" style={{ ...cardStyle, height: 'fit-content' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
                             <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>💳 Cüzdanlar & Kartlar</h4>
                             <button onClick={() => modalAc('hesap_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#3182ce', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
                                 <span>+</span> Hesap Ekle
@@ -231,7 +231,7 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* TAKSİTLER */}
-                    <div style={cardStyle}>
+                    <div className="responsive-card" style={cardStyle}>
                         <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2d3748' }}>📦 Taksitli Alışverişler</h4>
                         {taksitler.length === 0 ? <p style={{ fontSize: '13px', color: '#aaa' }}>Aktif taksit borcu yok.</p> :
                             <div style={{ marginBottom: '15px' }}>
@@ -264,7 +264,7 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* FATURALAR (YENİ MODÜL) */}
-                    <div style={{ ...cardStyle, height: 'fit-content' }}>
+                    <div className="responsive-card" style={{ ...cardStyle, height: 'fit-content' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                             <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>🧾 Faturalar & Abonelikler</h4>
                             <button onClick={() => modalAc('fatura_tanim_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#4a5568', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
@@ -306,7 +306,7 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* ABONELİKLER */}
-                    <div style={{ ...cardStyle, height: 'fit-content' }}>
+                    <div className="responsive-card" style={{ ...cardStyle, height: 'fit-content' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                             <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>🔄 Sabit Giderler</h4>
                             <button onClick={() => modalAc('abonelik_ekle')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#805ad5', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
@@ -339,7 +339,7 @@ const BudgetDashboard = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
 
                     {/* 1. KART: VERİ GİRİŞ FORMLARI */}
-                    <div style={cardStyle}>
+                    <div className="responsive-card" style={cardStyle}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                 <button onClick={() => setFormTab("islem")} style={{ padding: '8px 15px', borderRadius: '20px', border: 'none', cursor: 'pointer', background: formTab === "islem" ? '#ed8936' : '#edf2f7', color: formTab === "islem" ? 'white' : '#4a5568', fontWeight: 'bold', fontSize: '12px' }}>İşlem</button>
@@ -434,7 +434,7 @@ const BudgetDashboard = ({
                     </div>
 
                     {/* 2. KART: GEÇMİŞ LİSTESİ VE TABLO */}
-                    <div style={cardStyle}>
+                    <div className="responsive-card" style={{ ...cardStyle, overflowX: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '5px' }}>
                             <h4 style={{ marginTop: 0, color: '#2c3e50', margin: 0 }}>📜 Harcama Geçmişi</h4>
                             <div className="no-scrollbar" style={{ display: 'flex', gap: '5px', alignItems: 'center', overflowX: 'auto', whiteSpace: 'nowrap', maxWidth: '300px' }}>

@@ -56,8 +56,45 @@ export const useCalculations = (
         });
     }, [islemler, aktifYatirimAy, yatirimArama, filtreYatirimTuru]);
 
-    const mevcutAylar = ["Tümü", ...new Set(islemler.map(i => ayIsmiGetir(i.tarih)))];
+    // 3. Tarih Filtresi Aylarının Dinamik Hesaplanması
+    const mevcutAylar = useMemo(() => {
+        if (!islemler || islemler.length === 0) return ["Tümü"];
 
+        const benzersizAylarMap = new Map();
+
+        islemler.forEach(i => {
+            if (!i.tarih) return;
+            // timestamp to Date
+            const d = new Date(i.tarih.seconds * 1000);
+
+            // YYYYMM format for chronological sorting
+            const sortKey = d.getFullYear() * 100 + d.getMonth();
+            const ayIsmi = ayIsmiGetir(i.tarih);
+
+            if (!benzersizAylarMap.has(sortKey)) {
+                benzersizAylarMap.set(sortKey, ayIsmi);
+            }
+        });
+
+        // Sort descending (newest month first)
+        const sortedKeys = Array.from(benzersizAylarMap.keys()).sort((a, b) => b - a);
+
+        const aylarListesi = ["Tümü"];
+        sortedKeys.forEach(key => {
+            aylarListesi.push(benzersizAylarMap.get(key));
+        });
+
+        return aylarListesi;
+    }, [islemler]);
+
+    // Sayfa açıldığında veya veriler güncellendiğinde eğer mevcut seçili ay boşsa (veri yoksa),
+    // otomatik olarak verisi bulunan en güncel aya (index 1) geçiş yapmasını sağlar.
+    useEffect(() => {
+        if (mevcutAylar.length > 1) {
+            setAktifAy(prev => (prev !== "Tümü" && !mevcutAylar.includes(prev)) ? mevcutAylar[1] : prev);
+            setAktifYatirimAy(prev => (prev !== "Tümü" && !mevcutAylar.includes(prev)) ? mevcutAylar[1] : prev);
+        }
+    }, [mevcutAylar]);
     // Totals
     const bugunGider = filtrelenmisIslemler.filter(i => {
         const d = new Date(i.tarih.seconds * 1000);

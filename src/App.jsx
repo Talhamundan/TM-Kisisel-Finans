@@ -11,6 +11,7 @@ import BudgetDashboard from './components/Budget/BudgetDashboard';
 import InvestmentDashboard from './components/Investment/InvestmentDashboard';
 import GoalsInventory from './components/Budget/GoalsInventory';
 import ModalManager from './components/Modals/ModalManager';
+import MobileNav from './components/Layout/MobileNav';
 
 // Hooks
 import { useAuth } from './hooks/useAuth';
@@ -363,7 +364,7 @@ function App() {
     );
 
     return (
-        <div style={{ padding: '30px', fontFamily: 'Segoe UI', width: '100vw', boxSizing: 'border-box', background: '#f7f9fc', minHeight: '100vh', color: '#333', overflowX: 'hidden' }}>
+        <div style={{ paddingTop: '95px', paddingLeft: '30px', paddingRight: '30px', paddingBottom: '30px', fontFamily: 'Segoe UI', width: '100vw', boxSizing: 'border-box', background: '#f7f9fc', minHeight: '100vh', color: '#333', overflowX: 'hidden' }}>
             <ToastContainer position="top-right" autoClose={2000} theme="light" />
 
             <ModalManager
@@ -441,12 +442,14 @@ function App() {
                 pozisyonSil={investmentActions.pozisyonSil} // NEW PROP assigned
 
                 onConfirmLogout={handleConfirmLogout}
-                // FIXED: Passing missing action props
                 maasEkle={budgetActions.maasEkle}
                 hesapEkle={budgetActions.hesapEkle}
                 faturaTanimEkle={budgetActions.faturaTanimEkle}
                 abonelikEkle={budgetActions.abonelikEkle}
                 gecmisIslemEkle={investmentActions.gecmisIslemEkle}
+                islemSil={budgetActions.islemSil}
+                // NEW PROPS FOR MOBILE TRANSACTION ADD MODAL
+                islemEkle={budgetActions.islemEkle}
             />
 
             <Header
@@ -633,6 +636,13 @@ function App() {
 
             {/* Geri Bildirim Butonu */}
             <Feedback userEmail={user?.email} />
+
+            {/* Mobil Alt Navigasyon Barı */}
+            <MobileNav
+                anaSekme={anaSekme}
+                setAnaSekme={setAnaSekme}
+                modalAc={modalAc}
+            />
         </div>
     );
 }

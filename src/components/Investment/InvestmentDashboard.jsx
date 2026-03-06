@@ -377,7 +377,7 @@ const InvestmentDashboard = ({
             </div>
 
             {/* PORTFOLIO ANALYSIS TABLE (ALL TIME) */}
-            <PortfolioAnalysisTable tumIslemler={tumIslemler} formatPara={formatPara} modalAc={modalAc} pozisyonSil={pozisyonSil} portfoy={portfoy} />
+            <PortfolioAnalysisTable tumIslemler={tumIslemler} formatPara={formatPara} modalAc={modalAc} pozisyonSil={pozisyonSil} portfoy={portfoy} islemSil={islemSil} />
 
 
             <footer style={{ textAlign: 'center', marginTop: '30px', padding: '10px', color: '#a0aec0', fontSize: '12px' }}>
@@ -390,7 +390,7 @@ const InvestmentDashboard = ({
 // Safe rendering helper
 const safeVal = (val, suffix = "") => val ? val + suffix : "";
 
-const PortfolioAnalysisTable = ({ tumIslemler, formatPara, modalAc, pozisyonSil, portfoy }) => {
+const PortfolioAnalysisTable = ({ tumIslemler, formatPara, modalAc, pozisyonSil, portfoy, islemSil }) => {
     const [hoverIndex, setHoverIndex] = React.useState(-1); // For hover effect
 
     // Create Price Map for Real-time valuations
@@ -643,9 +643,27 @@ const PortfolioAnalysisTable = ({ tumIslemler, formatPara, modalAc, pozisyonSil,
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>
                                             <span
-                                                onClick={() => modalAc('pozisyon_sil_onay', { row })}
-                                                style={{ cursor: 'pointer', fontSize: '16px' }}
-                                                title="Pozisyonu Sil"
+                                                onClick={() => {
+                                                    // Determine the underlying transaction ID to delete from nakit_islemleri
+                                                    const txIdToDelete = row.isClosed ? row.sellContext?.id : row.buyContext?.id;
+                                                    if (txIdToDelete) {
+                                                        // Fallback to normal delete modal
+                                                        modalAc('islem_sil_onay', { id: txIdToDelete, type: 'islem' });
+                                                    } else {
+                                                        alert("Silinecek işlem ID'si bulunamadı.");
+                                                    }
+                                                }}
+                                                onMouseEnter={() => setHoverIndex(index + 1000)} // Different index for hover
+                                                onMouseLeave={() => setHoverIndex(-1)}
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    fontSize: '16px',
+                                                    display: 'inline-block',
+                                                    transform: hoverIndex === (index + 1000) ? 'scale(1.2)' : 'scale(1)',
+                                                    transition: 'transform 0.2s',
+                                                    filter: hoverIndex === (index + 1000) ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
+                                                }}
+                                                title="İşlemi Sil"
                                             >
                                                 🗑️
                                             </span>

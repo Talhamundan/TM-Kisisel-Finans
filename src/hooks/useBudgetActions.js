@@ -752,7 +752,9 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         setIslemTutar(v.tutar);
         setIslemAdet(v.adet || ""); // Fill Quantity
         setIslemBirimFiyat(v.birimFiyat || ""); // Fill Unit Price
-        if (v.islemTipi?.includes('yatirim')) { setKategori(v.yatirimTuru || "Hisse"); } else { setKategori(v.kategori); }
+        if (v.islemTipi === 'transfer') { setKategori("Transfer"); }
+        else if (v.islemTipi?.includes('yatirim')) { setKategori(v.yatirimTuru || "Hisse"); }
+        else { setKategori(v.kategori); }
         if (v.tarih) { const date = new Date(v.tarih.seconds * 1000); const isoString = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16); setIslemTarihi(isoString); }
     }
     const fillSubscriptionForm = (v) => { setAboAd(v.ad); setAboTutar(v.tutar); setAboGun(v.gun); setAboHesapId(v.hesapId); setAboKategori(v.kategori); }

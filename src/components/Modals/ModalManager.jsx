@@ -3,6 +3,58 @@ import HighQualityModal from '../Shared/HighQualityModal';
 import { formatCurrencyPlain, inputStyle, tarihSadeceGunAyYil } from '../../utils/helpers';
 
 // Sub-component to handle Portföy Düzenleme with own state
+const IslemEkleMobilModal = ({ close, islemEkle, hesaplar, kategoriListesi, inputStyle }) => {
+    const [hesapId, setHesapId] = useState("");
+    const [islemTipi, setIslemTipi] = useState("gider");
+    const [kategori, setKategori] = useState(kategoriListesi && kategoriListesi[0] ? kategoriListesi[0] : "");
+    const [aciklama, setAciklama] = useState("");
+    const [tutar, setTutar] = useState("");
+
+    // Default to current date and time
+    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 16);
+    const [tarih, setTarih] = useState(localISOTime);
+
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setIsProcessing(true);
+        const success = await islemEkle(e, { hesapId, islemTipi, kategori, aciklama, tutar, tarih });
+        setIsProcessing(false);
+        if (success !== false) close();
+    }
+
+    return (
+        <HighQualityModal isOpen={true} onClose={close} title="Hızlı İşlem Ekle" icon="⚡" color="#805ad5">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <select value={hesapId} onChange={e => setHesapId(e.target.value)} style={{ flex: 1, ...inputStyle }} required>
+                        <option value="">Hangi Hesap?</option>
+                        {(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({h.guncelBakiye}₺)</option>)}
+                    </select>
+                    <select value={islemTipi} onChange={e => setIslemTipi(e.target.value)} style={{ flex: 1, ...inputStyle }}>
+                        <option value="gider">🔴 Gider</option>
+                        <option value="gelir">🟢 Gelir</option>
+                    </select>
+                </div>
+                <select value={kategori} onChange={e => setKategori(e.target.value)} style={{ ...inputStyle }}>
+                    {(kategoriListesi || []).map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <input placeholder="Açıklama" value={aciklama} onChange={e => setAciklama(e.target.value)} style={{ flex: 1, ...inputStyle }} />
+                    <input type="number" placeholder="Tutar (₺)" value={tutar} onChange={e => setTutar(e.target.value)} style={{ flex: 1, ...inputStyle }} required step="0.01" />
+                </div>
+                <input type="datetime-local" value={tarih} onChange={e => setTarih(e.target.value)} style={{ ...inputStyle }} required />
+
+                <button type="submit" disabled={isProcessing} style={{ padding: '15px', background: '#805ad5', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px', opacity: isProcessing ? 0.7 : 1 }}>
+                    {isProcessing ? 'KAYDEDİLİYOR...' : 'KAYDET'}
+                </button>
+            </form>
+        </HighQualityModal>
+    );
+};
+
 const PositionEditModal = ({ seciliVeri, pozisyonGuncelle, close, inputStyle }) => {
     // Helper to safe parse date
     const safeDate = (str) => {
@@ -179,6 +231,8 @@ const ModalManager = ({
 
     // ADDED: New props for add actions (Already passed, but ensuring they are destructured if not)
     maasEkle, hesapEkle, faturaTanimEkle, abonelikEkle, gecmisIslemEkle,
+    // Fix: islemSil destructured here to fix undefined error
+    islemSil,
 
 }) => {
 
@@ -388,6 +442,7 @@ const ModalManager = ({
         if (!seciliVeri) return null; // STRICT SAFE ACCESS
         title = "İşlemi Düzenle";
         const isInvestment = (seciliVeri.islemTipi && seciliVeri.islemTipi.includes('yatirim')) || seciliVeri.kategori === 'Yatırım';
+        const isTransfer = seciliVeri.islemTipi === 'transfer' || seciliVeri.kategori === 'Transfer';
 
         // Auto-Calc Handler
         const handleCalc = (val, type) => {
@@ -420,47 +475,71 @@ const ModalManager = ({
 
         content = (
             <form onSubmit={(e) => islemDuzenle(e, seciliVeri.id, seciliVeri).then(res => res && close())}>
-                <input value={islemAciklama} onChange={e => setIslemAciklama(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="Açıklama" />
+                <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4a5568', fontWeight: 'bold', marginBottom: '5px' }}>İşlem Açıklaması</label>
+                    <input value={islemAciklama} onChange={e => setIslemAciklama(e.target.value)} style={{ ...inputStyle, padding: '12px 15px', fontSize: '14px' }} placeholder="Açıklama" />
+                </div>
 
                 {/* CONDITIONAL RENDERING for Investment Fields */}
                 {isInvestment && (
-                    <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
                         <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '11px', color: '#718096', fontWeight: 'bold' }}>Adet</label>
+                            <label style={{ display: 'block', fontSize: '12px', color: '#4a5568', fontWeight: 'bold', marginBottom: '5px' }}>Adet</label>
                             <input
                                 type="number"
+                                step="0.001"
                                 value={islemAdet ?? ''}
                                 onChange={e => handleCalc(e.target.value, 'adet')}
-                                style={inputStyle}
+                                style={{ ...inputStyle, padding: '12px 15px', fontSize: '14px' }}
                                 placeholder="0"
                             />
                         </div>
                         <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '11px', color: '#718096', fontWeight: 'bold' }}>Birim Fiyat</label>
-                            <input
-                                type="number"
-                                value={islemBirimFiyat ?? ''}
-                                onChange={e => handleCalc(e.target.value, 'fiyat')}
-                                style={inputStyle}
-                                placeholder="0.00"
-                            />
+                            <label style={{ display: 'block', fontSize: '12px', color: '#4a5568', fontWeight: 'bold', marginBottom: '5px' }}>Birim Fiyat</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={islemBirimFiyat ?? ''}
+                                    onChange={e => handleCalc(e.target.value, 'fiyat')}
+                                    style={{ ...inputStyle, padding: '12px 15px', paddingRight: '30px', fontSize: '14px' }}
+                                    placeholder="0.00"
+                                />
+                                <span style={{ position: 'absolute', right: '12px', top: '12px', color: '#718096', fontWeight: 'bold' }}>₺</span>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                <label style={{ fontSize: '11px', color: '#718096', fontWeight: 'bold' }}>Toplam Tutar</label>
-                <input type="number" value={islemTutar} onChange={e => handleAmountChange(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="Tutar" />
+                <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4a5568', fontWeight: 'bold', marginBottom: '5px' }}>Toplam Tutar</label>
+                    <div style={{ position: 'relative' }}>
+                        <input type="number" step="0.01" value={islemTutar} onChange={e => handleAmountChange(e.target.value)} style={{ ...inputStyle, padding: '12px 15px', paddingRight: '30px', fontSize: '18px', fontWeight: 'bold', color: '#2d3748' }} placeholder="Tutar" />
+                        <span style={{ position: 'absolute', right: '12px', top: '13px', color: '#718096', fontWeight: 'bold', fontSize: '16px' }}>₺</span>
+                    </div>
+                </div>
 
-                <input type="datetime-local" value={islemTarihi} onChange={e => setIslemTarihi(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
+                <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4a5568', fontWeight: 'bold', marginBottom: '5px' }}>İşlem Tarihi</label>
+                    <input type="datetime-local" value={islemTarihi} onChange={e => setIslemTarihi(e.target.value)} style={{ ...inputStyle, padding: '12px 15px', fontSize: '14px' }} />
+                </div>
 
-                {seciliVeri.kategori === 'BES' ? (
-                    <div style={{ marginBottom: '20px' }}><label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '5px' }}>Kategori</label><input value="BES" disabled style={{ ...inputStyle, background: '#f8fafc', color: '#94a3b8' }} /></div>
-                ) : (isInvestment) ? (
-                    <select value={kategori} onChange={e => setKategori(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }}>{yatirimTurleri.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                ) : (
-                    <select value={kategori} onChange={e => setKategori(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }}>{kategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}</select>
-                )}
-                <button type="submit" style={{ width: '100%', background: '#6366f1', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>Kaydet</button>
+                <div style={{ marginBottom: '25px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4a5568', fontWeight: 'bold', marginBottom: '5px' }}>Kategori</label>
+                    {seciliVeri.kategori === 'BES' ? (
+                        <input value="BES" disabled style={{ ...inputStyle, background: '#f8fafc', color: '#94a3b8', padding: '12px 15px', fontSize: '14px', cursor: 'not-allowed' }} />
+                    ) : (isTransfer) ? (
+                        <input value="Transfer" disabled style={{ ...inputStyle, background: '#f8fafc', color: '#94a3b8', padding: '12px 15px', fontSize: '14px', cursor: 'not-allowed' }} />
+                    ) : (isInvestment) ? (
+                        <select value={kategori} onChange={e => setKategori(e.target.value)} style={{ ...inputStyle, padding: '12px 15px', fontSize: '14px' }}>{yatirimTurleri.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                    ) : (
+                        <select value={kategori} onChange={e => setKategori(e.target.value)} style={{ ...inputStyle, padding: '12px 15px', fontSize: '14px' }}>{kategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}</select>
+                    )}
+                </div>
+
+                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #4f46e5, #6366f1)', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2)', cursor: 'pointer', transition: 'transform 0.1s' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+                    DEĞİŞİKLİKLERİ KAYDET
+                </button>
             </form>
         );
     }
@@ -838,6 +917,65 @@ const ModalManager = ({
                                 if (success !== false) close();
                             } else {
                                 close();
+                            }
+                        }}
+                        disabled={isProcessing}
+                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#e53e3e', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px', opacity: isProcessing ? 0.7 : 1 }}
+                    >
+                        {isProcessing ? 'SİLİNİYOR...' : 'SİL'}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+    else if (aktifModal === 'islem_sil_onay') {
+        title = "İşlemi Sil";
+        icon = "🗑️";
+        content = (
+            <div>
+                <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+                    <div style={{ fontSize: '16px', color: '#4a5568', marginBottom: '10px', fontWeight: 'bold' }}>
+                        Bu işlemi silmek istediğinize emin misiniz?
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#718096' }}>
+                        Bu işlem kalıcı olarak silinecek ve ilgili bakiye işlemleriniz buna göre güncellenecektir. Analiz tablosundan pozisyon kaldırılacaktır.
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px' }}>
+                    <button
+                        onClick={close}
+                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#e2e8f0', color: '#4a5568', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' }}
+                    >
+                        İPTAL
+                    </button>
+                    <button
+                        onClick={async () => {
+                            try {
+                                console.log("SILME TETIKLENDI - islemSil function:", !!islemSil, "seciliVeri:", seciliVeri);
+                                // Fallback to seciliVeri if seciliVeri.id is not directly there.
+                                const deleteId = seciliVeri?.id || seciliVeri?.row?.id;
+
+                                if (!islemSil) {
+                                    alert("Sistemsel Hata: Silme fonksiyonu bulunamadı (islemSil eksik).");
+                                    close();
+                                    return;
+                                }
+
+                                if (!deleteId) {
+                                    alert("Silinecek işlem ID'si bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+                                    close();
+                                    return;
+                                }
+
+                                setIsProcessing(true);
+                                const success = await islemSil(deleteId);
+                                setIsProcessing(false);
+                                if (success !== false) close();
+                            } catch (error) {
+                                console.error("Silme sirasinda hata:", error);
+                                setIsProcessing(false);
+                                alert("Silme işlemi sırasında bir hata oluştu.");
                             }
                         }}
                         disabled={isProcessing}

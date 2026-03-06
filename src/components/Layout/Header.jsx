@@ -13,13 +13,19 @@ const Header = ({
 }) => {
     return (
         <div style={{
-            marginBottom: '25px',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            zIndex: 50,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: '#ffffff',
-            padding: '10px 20px',
-            borderRadius: '16px',
+            background: 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            padding: '15px 30px',
+            boxSizing: 'border-box',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
         }}>
 
@@ -35,7 +41,7 @@ const Header = ({
             </div>
 
             {/* ORTA: NAVİGASYON BUTONLARI */}
-            <div style={{ display: 'flex', background: '#edf2f7', padding: '4px', borderRadius: '12px' }}>
+            <div className="hide-on-mobile" style={{ display: 'flex', background: '#edf2f7', padding: '4px', borderRadius: '12px' }}>
                 <button
                     onClick={() => setAnaSekme("butcem")}
                     style={{
