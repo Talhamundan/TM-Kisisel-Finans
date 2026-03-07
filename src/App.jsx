@@ -119,9 +119,9 @@ function App() {
     }
 
     // Settings Updaters
-    const onLimitChange = (e) => {
-        data.setAylikLimit(e.target.value);
-        setDoc(doc(db, "ayarlar", alanKodu), { limit: e.target.value }, { merge: true });
+    const onLimitChange = (limit) => {
+        data.setAylikLimit(limit);
+        setDoc(doc(db, "ayarlar", alanKodu), { limit: limit }, { merge: true });
     }
     const onKategoriUpdate = (y) => {
         data.setKategoriListesi(y);
