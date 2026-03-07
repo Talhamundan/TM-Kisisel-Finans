@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell } from 'recharts';
 import { cardStyle, inputStyle, formatCurrencyPlain, tarihFormatla, tarihSadeceGunAyYil, COLORS } from '../../utils/helpers';
 
@@ -82,12 +82,21 @@ const BudgetDashboard = ({
     setAktifAy,
     aramaMetni, setAramaMetni,
     filtreKategori, setFiltreKategori,
+    borclar,
+    toplamKalanBorc,
+    borcOde,
+    borcDuzenle,
     excelIndir,
     excelYukle,
     islemSil
 }) => {
 
     const formatPara = (tutar) => gizliMod ? "**** ₺" : formatCurrencyPlain(tutar);
+
+    const [localLimit, setLocalLimit] = useState(aylikLimit);
+    useEffect(() => {
+        setLocalLimit(aylikLimit);
+    }, [aylikLimit]);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}> {/* Ana Container gap düzeltildi */}
@@ -143,7 +152,7 @@ const BudgetDashboard = ({
                     <div className="responsive-card" style={cardStyle}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                             <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>🎯 Aylık Bütçe Limiti</h4>
-                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="number" value={aylikLimit} onChange={(e) => onLimitChange(parseInt(e.target.value) || 0)} style={{ width: '70px', border: '1px solid #ddd', borderRadius: '5px', padding: '2px', background: 'white', color: '#333' }} /></div>
+                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="number" value={localLimit} onChange={(e) => setLocalLimit(e.target.value)} onBlur={(e) => onLimitChange(parseInt(e.target.value) || 0)} style={{ width: '70px', border: '1px solid #ddd', borderRadius: '5px', padding: '2px', background: 'white', color: '#333' }} /></div>
                         </div>
                         <div style={{ marginBottom: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '5px', fontWeight: 'bold' }}><span style={{ color: limitRenk }}>Harcanan: {formatPara(harcananLimit)}</span><span>{Math.round(limitYuzdesi)}%</span></div>
@@ -331,6 +340,46 @@ const BudgetDashboard = ({
                         </div>
                         <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee', textAlign: 'right', fontSize: '13px' }}>
                             <span style={{ color: '#718096' }}>Aylık Sabit Gider: <b style={{ color: '#e53e3e' }}>{formatPara(toplamSabitGider)}</b></span>
+                        </div>
+                    </div>
+
+                    {/* BORÇLAR (YENİ MODÜL) */}
+                    <div className="responsive-card" style={cardStyle}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h4 style={{ marginTop: 0, marginBottom: 0, color: '#2d3748' }}>💸 Borçlar</h4>
+                            <button onClick={() => modalAc('borc_tanimla')} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: '#e53e3e', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                <span>+</span> Borç Tanımla
+                            </button>
+                        </div>
+                        {(!borclar || borclar.length === 0) ? <p style={{ fontSize: '13px', color: '#aaa' }}>Aktif borç kaydı yok.</p> :
+                            <div style={{ marginBottom: '15px' }}>
+                                {(borclar || []).map(b => {
+                                    const yuzde = ((b.toplamTutar - b.kalanTutar) / b.toplamTutar) * 100;
+                                    return (
+                                        <div key={b.id} style={{ padding: '10px', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                <div><b>{b.ad}</b></div>
+                                                <span style={{ fontWeight: 'bold' }}>{formatPara(b.kalanTutar)} <small style={{ color: '#999' }}>Kaldı</small></span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#666', marginBottom: '5px' }}>
+                                                <span>{formatPara(b.toplamTutar - b.kalanTutar)} Ödendi</span>
+                                                <span>Toplam: {formatPara(b.toplamTutar)}</span>
+                                            </div>
+                                            <div style={{ width: '100%', height: '8px', background: '#eee', borderRadius: '4px', marginBottom: '10px' }}>
+                                                <div style={{ width: `${Math.min(100, Math.max(0, yuzde))}%`, height: '100%', background: '#805ad5', borderRadius: '4px', transition: 'width 0.5s' }}></div>
+                                            </div>
+                                            <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px', alignItems: 'center' }}>
+                                                <button onClick={() => modalAc('borc_ode', b)} style={{ background: '#805ad5', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}>Ödeme Yap</button>
+                                                <span onClick={() => modalAc('duzenle_borc', b)} style={{ cursor: 'pointer', fontSize: '12px' }}>✏️</span>
+                                                <span onClick={() => normalSil("borclar", b.id)} style={{ cursor: 'pointer', fontSize: '12px' }}>🗑️</span>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        }
+                        <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                            <span style={{ color: '#718096' }}>Kalan Toplam Borç: <b style={{ color: '#e53e3e' }}>{formatPara(toplamKalanBorc)}</b></span>
                         </div>
                     </div>
                 </div>

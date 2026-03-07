@@ -234,6 +234,12 @@ const ModalManager = ({
     // Fix: islemSil destructured here to fix undefined error
     islemSil,
 
+    // Borç Props
+    borcAd, setBorcAd,
+    borcTutar, setBorcTutar,
+    borcKalanTutar, setBorcKalanTutar,
+    borcEkle, borcDuzenle, borcOde
+
 }) => {
 
 
@@ -567,6 +573,59 @@ const ModalManager = ({
                 <input type="number" value={maasGun} onChange={e => setMaasGun(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="Gün (1-31)" />
                 <select value={maasHesapId} onChange={e => setMaasHesapId(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }}><option value="">Hesap Seç</option>{hesaplar.map(h => <option key={h.id} value={h.id}>{h.hesapAdi}</option>)}</select>
                 <button type="submit" style={{ width: '100%', background: '#48bb78', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold' }}>GÜNCELLE</button>
+            </form>
+        );
+    }
+
+    else if (aktifModal === 'borc_tanimla') {
+        title = "Borç Tanımla";
+        icon = "💸";
+        content = (
+            <form onSubmit={(e) => borcEkle(e).then(res => res && close())}>
+                <input placeholder="Borç Adı (Örn: Babam, Trafik Cezası)" value={borcAd || ''} onChange={e => setBorcAd(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <input type="number" placeholder="Toplam Borç Tutarı (₺)" value={borcTutar || ''} onChange={e => setBorcTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <input type="number" placeholder="Kalan Borç (Boşsa tamamı olur)" value={borcKalanTutar || ''} onChange={e => setBorcKalanTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
+                <button type="submit" style={{ width: '100%', background: '#e53e3e', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>KAYDET</button>
+            </form>
+        );
+    }
+
+    else if (aktifModal === 'duzenle_borc') {
+        title = "Borcu Düzenle";
+        icon = "✏️";
+        content = (
+            <form onSubmit={(e) => borcDuzenle(e, seciliVeri.id).then(res => res && close())}>
+                <input placeholder="Borç Adı" value={borcAd || ''} onChange={e => setBorcAd(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <input type="number" placeholder="Toplam Borç Tutarı (₺)" value={borcTutar || ''} onChange={e => setBorcTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <input type="number" placeholder="Kalan Borç" value={borcKalanTutar || ''} onChange={e => setBorcKalanTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} required />
+                <button type="submit" style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>GÜNCELLE</button>
+            </form>
+        );
+    }
+
+    else if (aktifModal === 'borc_ode') {
+        title = "Borç Öde";
+        icon = "💳";
+        const [odemeTutarState, setOdemeTutarState] = useState("");
+        const [secilenHesapIdState, setSecilenHesapIdState] = useState("");
+
+        content = (
+            <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!odemeTutarState || !secilenHesapIdState) return alert("Lütfen tutar ve hesap seçiniz.");
+                const res = await borcOde(seciliVeri, odemeTutarState, secilenHesapIdState);
+                if (res) close();
+            }}>
+                <div style={{ marginBottom: '20px', padding: '15px', background: '#fdf2f8', borderRadius: '12px', color: '#831843' }}>
+                    <p style={{ margin: 0, fontWeight: 'bold', fontSize: '16px' }}>{seciliVeri?.ad}</p>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '13px' }}>Kalan Borç: <b>{formatPara(seciliVeri?.kalanTutar)}</b></p>
+                </div>
+                <input type="number" autoFocus placeholder="Kaç TL ödeyeceksin?" value={odemeTutarState} onChange={e => setOdemeTutarState(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <select value={secilenHesapIdState} onChange={e => setSecilenHesapIdState(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} required>
+                    <option value="">Ödeme Aracı (Hangi Hesaptan?)</option>
+                    {(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({formatPara(h.guncelBakiye)})</option>)}
+                </select>
+                <button type="submit" style={{ width: '100%', background: '#805ad5', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>ÖDEMEYİ YAP</button>
             </form>
         );
     }

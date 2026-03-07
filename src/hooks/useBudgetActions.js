@@ -53,6 +53,11 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const [maasGun, setMaasGun] = useState("");
     const [maasHesapId, setMaasHesapId] = useState("");
 
+    // Borç
+    const [borcAd, setBorcAd] = useState("");
+    const [borcTutar, setBorcTutar] = useState("");
+    const [borcKalanTutar, setBorcKalanTutar] = useState("");
+
     // Fatura Tanım / Giriş
     const [tanimBaslik, setTanimBaslik] = useState("");
     const [tanimKurum, setTanimKurum] = useState("");
@@ -486,6 +491,73 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const maasYatir = async (maas) => { const result = await Swal.fire({ title: 'Maaş Yatırılsın mı?', html: `💰 <b>${maas.ad}</b> tutarı (${formatCurrencyPlain(maas.tutar)}) hesaba işlensin mi?`, icon: 'question', showCancelButton: true, confirmButtonText: 'Evet, Yatır', confirmButtonColor: 'green' }); if (!result.isConfirmed) return; await addDoc(collection(db, "nakit_islemleri"), { uid: user.uid, alanKodu, hesapId: maas.hesapId, islemTipi: "gelir", kategori: "Maaş/Gelir", tutar: maas.tutar, aciklama: `${maas.ad} (Otomatik)`, tarih: new Date() }); await updateDoc(doc(db, "hesaplar", maas.hesapId), { guncelBakiye: increment(maas.tutar) }); toast.success("Gelir hesaba işlendi!"); }
     const maasDuzenle = async (e, id) => { e.preventDefault(); await updateDoc(doc(db, "maaslar", id), { ad: maasAd, tutar: parseFloat(maasTutar), gun: maasGun, hesapId: maasHesapId }); toast.success("Gelir kalemi güncellendi."); return true; }
 
+    // --- BORÇ ---
+    const borcEkle = async (e) => {
+        if (e) e.preventDefault();
+        try {
+            if (!borcAd || !borcTutar) {
+                toast.error("Eksik bilgi");
+                return false;
+            }
+            const tutar = parseFloat(borcTutar);
+            if (isNaN(tutar)) {
+                toast.error("Geçersiz tutar");
+                return false;
+            }
+            const kalan = borcKalanTutar ? parseFloat(borcKalanTutar) : tutar;
+            await addDoc(collection(db, "borclar"), {
+                uid: user.uid, alanKodu,
+                ad: borcAd, toplamTutar: tutar, kalanTutar: kalan,
+                eklenmeTarihi: new Date()
+            });
+            setBorcAd(""); setBorcTutar(""); setBorcKalanTutar("");
+            toast.success("Borç tanımlandı.");
+            return true;
+        } catch (err) {
+            console.error(err);
+            toast.error("Kayıt başarısız");
+            return false;
+        }
+    }
+
+    const borcDuzenle = async (e, id) => {
+        e.preventDefault();
+        await updateDoc(doc(db, "borclar", id), {
+            ad: borcAd,
+            toplamTutar: parseFloat(borcTutar),
+            kalanTutar: parseFloat(borcKalanTutar)
+        });
+        toast.success("Borç güncellendi.");
+        return true;
+    }
+
+    const borcOde = async (borc, odemeTutar, secilenHesapId) => {
+        try {
+            const odeme = parseFloat(odemeTutar);
+            // 1. İşlemi Kaydet (Gider)
+            await addDoc(collection(db, "nakit_islemleri"), {
+                uid: user.uid, alanKodu,
+                hesapId: secilenHesapId,
+                islemTipi: "gider", kategori: "Borç Ödemesi",
+                tutar: odeme, aciklama: `${borc.ad} - Borç Ödemesi`,
+                tarih: new Date()
+            });
+
+            // 2. Bakiyeden Düş
+            await updateDoc(doc(db, "hesaplar", secilenHesapId), { guncelBakiye: increment(-odeme) });
+
+            // 3. Borcun Kalan Tutarını Düş
+            await updateDoc(doc(db, "borclar", borc.id), { kalanTutar: increment(-odeme) });
+
+            toast.success("Ödeme işlendi.");
+            return true;
+        } catch (err) {
+            console.error(err);
+            toast.error("Ödeme işlenemedi");
+            return false;
+        }
+    }
+
     // --- FATURA ---
     // --- FATURA ---
     const faturaTanimEkle = async (e) => {
@@ -760,6 +832,8 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const fillSubscriptionForm = (v) => { setAboAd(v.ad); setAboTutar(v.tutar); setAboGun(v.gun); setAboHesapId(v.hesapId); setAboKategori(v.kategori); }
     const fillInstallmentForm = (v) => { setTaksitBaslik(v.baslik); setTaksitToplamTutar(v.toplamTutar); setTaksitSayisi(v.taksitSayisi); setTaksitHesapId(v.hesapId); setTaksitKategori(v.kategori); if (v.alisTarihi) { const d = new Date(v.alisTarihi.seconds * 1000); setTaksitAlisTarihi(d.toISOString().split('T')[0]); } }
     const fillSalaryForm = (v) => { setMaasAd(v.ad); setMaasTutar(v.tutar); setMaasGun(v.gun); setMaasHesapId(v.hesapId); }
+    const fillBorcForm = (v) => { setBorcAd(v.ad); setBorcTutar(v.toplamTutar); setBorcKalanTutar(v.kalanTutar); }
+    const resetBorcForm = () => { setBorcAd(""); setBorcTutar(""); setBorcKalanTutar(""); }
     const fillBillForm = (v) => { setFaturaGirisTutar(v.tutar); setFaturaGirisTarih(v.sonOdemeTarihi); setFaturaGirisAciklama(v.aciklama || ""); }
     const fillBillDefForm = (v) => { setTanimBaslik(v.baslik); setTanimKurum(v.kurum); setTanimAboneNo(v.aboneNo); }
     const fillCCForm = (v) => { setKkOdemeKartId(v.id); }
@@ -773,6 +847,7 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         aboAd, setAboAd, aboTutar, setAboTutar, aboGun, setAboGun, aboHesapId, setAboHesapId, aboKategori, setAboKategori,
         taksitBaslik, setTaksitBaslik, taksitToplamTutar, setTaksitToplamTutar, taksitSayisi, setTaksitSayisi, taksitHesapId, setTaksitHesapId, taksitKategori, setTaksitKategori, taksitAlisTarihi, setTaksitAlisTarihi,
         maasAd, setMaasAd, maasTutar, setMaasTutar, maasGun, setMaasGun, maasHesapId, setMaasHesapId,
+        borcAd, setBorcAd, borcTutar, setBorcTutar, borcKalanTutar, setBorcKalanTutar,
         tanimBaslik, setTanimBaslik, tanimKurum, setTanimKurum, tanimAboneNo, setTanimAboneNo, secilenTanimId, setSecilenTanimId, faturaGirisTutar, setFaturaGirisTutar, faturaGirisTarih, setFaturaGirisTarih, faturaGirisAciklama, setFaturaGirisAciklama,
         kkOdemeKartId, setKkOdemeKartId, kkOdemeKaynakId, setKkOdemeKaynakId, kkOdemeTutar, setKkOdemeTutar,
         tasimaIslemiSuruyor, setTasimaIslemiSuruyor, yeniKodInput, setYeniKodInput,
@@ -784,10 +859,11 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         taksitEkle, taksitOde, taksitDuzenle,
         abonelikEkle, abonelikOde, abonelikDuzenle,
         maasEkle, maasYatir, maasDuzenle,
+        borcEkle, borcDuzenle, borcOde,
         faturaTanimEkle, faturaGir, faturaOde, bekleyenFaturaDuzenle, faturaTanimDuzenle,
         excelIndir, excelYukle, verileriTasi,
 
         // Fillers
-        fillAccountForm, fillTransactionForm, fillSubscriptionForm, fillInstallmentForm, fillSalaryForm, fillBillForm, fillBillDefForm, fillCCForm
+        fillAccountForm, fillTransactionForm, fillSubscriptionForm, fillInstallmentForm, fillSalaryForm, fillBorcForm, resetBorcForm, fillBillForm, fillBillDefForm, fillCCForm
     };
 };

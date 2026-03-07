@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { ayIsmiGetir, formatCurrencyPlain } from '../utils/helpers';
 
 export const useCalculations = (
-    data, // { hesaplar, islemler, portfoy, abonelikler, taksitler, maaslar, bekleyenFaturalar, tanimliFaturalar }
+    data, // { hesaplar, islemler, portfoy, abonelikler, taksitler, maaslar, bekleyenFaturalar, tanimliFaturalar, besVerisi, satislar, borclar }
     gizliMod,
     aylikLimit
 ) => {
-    const { hesaplar, islemler, portfoy, abonelikler, taksitler, maaslar, bekleyenFaturalar, tanimliFaturalar, besVerisi, satislar } = data;
+    const { hesaplar, islemler, portfoy, abonelikler, taksitler, maaslar, bekleyenFaturalar, tanimliFaturalar, besVerisi, satislar, borclar } = data;
 
     // --- FILTER STATES ---
     const [aktifAy, setAktifAy] = useState(new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }));
@@ -138,6 +138,7 @@ export const useCalculations = (
     const toplamKarZarar = portfoyGuncelDegeri - portfoy.reduce((acc, p) => acc + (p.adet * p.alisFiyati), 0);
     const portfoyVerisi = portfoy.reduce((acc, curr) => { const guncelTutar = curr.adet * (curr.guncelFiyat || curr.alisFiyati); const mevcut = acc.find(item => item.name === curr.sembol); if (mevcut) { mevcut.value += guncelTutar; } else { acc.push({ name: curr.sembol, value: guncelTutar }); } return acc; }, []);
 
+    const toplamKalanBorc = borclar ? borclar.reduce((sum, b) => sum + (b.kalanTutar || 0), 0) : 0;
     const toplamKalanTaksitBorcu = taksitler.reduce((acc, t) => acc + (t.toplamTutar - (t.aylikTutar * t.odenmisTaksit)), 0);
     const toplamSabitGider = abonelikler.reduce((acc, abo) => acc + abo.tutar, 0);
     const toplamNakitVarlik = hesaplar.reduce((acc, h) => acc + (parseFloat(h.guncelBakiye) || 0), 0);
@@ -292,6 +293,7 @@ export const useCalculations = (
         genelToplamYatirimGucu, genelVarlikVerisi, toplamYatirimHesapNakiti,
         netVarlik, sadeceCuzdanNakiti, toplamKalanTaksitBorcu, toplamSabitGider,
         kartYatirimToplami, toplamDovizVarligi: displayDovizVarligi, toplamBesVarligi, kartNakitToplami, toplamBesYatirimi,
+        toplamKalanBorc,
 
         // Others
         bildirimler,

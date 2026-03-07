@@ -12,6 +12,7 @@ export const useDataListeners = (user, alanKodu) => {
     const [portfoy, setPortfoy] = useState([]);
     const [bekleyenFaturalar, setBekleyenFaturalar] = useState([]);
     const [tanimliFaturalar, setTanimliFaturalar] = useState([]);
+    const [borclar, setBorclar] = useState([]);
     const [besVerisi, setBesVerisi] = useState(null);
     const [hedefler, setHedefler] = useState([]);
     const [envanter, setEnvanter] = useState([]);
@@ -32,7 +33,7 @@ export const useDataListeners = (user, alanKodu) => {
     useEffect(() => {
         if (!user || !alanKodu) {
             // Temizle
-            setHesaplar([]); setIslemler([]); setAbonelikler([]); setTaksitler([]); setMaaslar([]); setPortfoy([]); setBekleyenFaturalar([]); setTanimliFaturalar([]);
+            setHesaplar([]); setIslemler([]); setAbonelikler([]); setTaksitler([]); setMaaslar([]); setPortfoy([]); setBekleyenFaturalar([]); setTanimliFaturalar([]); setBorclar([]);
             return;
         }
 
@@ -44,6 +45,7 @@ export const useDataListeners = (user, alanKodu) => {
         const qPortfoy = query(collection(db, "portfoy"), where("alanKodu", "==", alanKodu));
         const qFaturalar = query(collection(db, "bekleyen_faturalar"), where("alanKodu", "==", alanKodu));
         const qFaturaTanim = query(collection(db, "fatura_tanimlari"), where("alanKodu", "==", alanKodu));
+        const qBorclar = query(collection(db, "borclar"), where("alanKodu", "==", alanKodu));
 
         // TEK REFERANS: Kullanıcının kendi ayar dokümanı (hem limitler hem BES verisi burada)
         const ayarlarDocRef = doc(db, "ayarlar", alanKodu);
@@ -75,6 +77,9 @@ export const useDataListeners = (user, alanKodu) => {
         });
         const u9 = onSnapshot(qFaturaTanim, (s) => {
             if (s && s.docs) setTanimliFaturalar(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const uBorc = onSnapshot(qBorclar, (s) => {
+            if (s && s.docs) setBorclar(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
 
         // Consolidated Listener for Settings (Limit, Categories, BES Data all in one doc)
@@ -110,11 +115,11 @@ export const useDataListeners = (user, alanKodu) => {
             }
         });
 
-        return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); }
+        return () => { u1(); u2(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); uBorc(); }
     }, [user, alanKodu]);
 
     return {
-        hesaplar, islemler, abonelikler, taksitler, maaslar, portfoy, bekleyenFaturalar, tanimliFaturalar, besVerisi,
+        hesaplar, islemler, abonelikler, taksitler, maaslar, portfoy, bekleyenFaturalar, tanimliFaturalar, besVerisi, borclar,
         kategoriListesi, setKategoriListesi,
         yatirimTurleri, setYatirimTurleri,
         aylikLimit, setAylikLimit,

@@ -116,6 +116,8 @@ function App() {
         if (tip === 'satis') budgetActions.setIslemTutar(veri.guncelFiyat || veri.alisFiyati);
         if (tip === 'duzenle_portfoy') investmentActions.fillPortfolioForm(veri);
         if (tip === 'tahsilat_ekle') investmentActions.setTahsilatTutar(veri.satisFiyati - veri.tahsilEdilen);
+        if (tip === 'duzenle_borc') budgetActions.fillBorcForm(veri);
+        if (tip === 'borc_tanimla') budgetActions.resetBorcForm();
     }
 
     // Settings Updaters
@@ -448,6 +450,13 @@ function App() {
                 abonelikEkle={budgetActions.abonelikEkle}
                 gecmisIslemEkle={investmentActions.gecmisIslemEkle}
                 islemSil={budgetActions.islemSil}
+
+                borcAd={budgetActions.borcAd} setBorcAd={budgetActions.setBorcAd}
+                borcTutar={budgetActions.borcTutar} setBorcTutar={budgetActions.setBorcTutar}
+                borcKalanTutar={budgetActions.borcKalanTutar} setBorcKalanTutar={budgetActions.setBorcKalanTutar}
+                borcEkle={budgetActions.borcEkle}
+                borcDuzenle={budgetActions.borcDuzenle}
+                borcOde={budgetActions.borcOde}
                 // NEW PROPS FOR MOBILE TRANSACTION ADD MODAL
                 islemEkle={budgetActions.islemEkle}
             />
@@ -570,6 +579,11 @@ function App() {
                     faturaGirisTutar={budgetActions.faturaGirisTutar} setFaturaGirisTutar={budgetActions.setFaturaGirisTutar}
                     faturaGirisTarih={budgetActions.faturaGirisTarih} setFaturaGirisTarih={budgetActions.setFaturaGirisTarih}
                     faturaGirisAciklama={budgetActions.faturaGirisAciklama} setFaturaGirisAciklama={budgetActions.setFaturaGirisAciklama}
+
+                    borclar={data.borclar}
+                    toplamKalanBorc={calculations.toplamKalanBorc}
+                    borcOde={budgetActions.borcOde}
+                    borcDuzenle={budgetActions.borcDuzenle}
 
                     excelIndir={() => budgetActions.excelIndir(data.islemler)}
                     excelYukle={budgetActions.excelYukle}
