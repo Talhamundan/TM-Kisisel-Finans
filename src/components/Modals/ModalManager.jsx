@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HighQualityModal from '../Shared/HighQualityModal';
 import { formatCurrencyPlain, inputStyle, tarihSadeceGunAyYil } from '../../utils/helpers';
 
@@ -238,6 +238,8 @@ const ModalManager = ({
     borcAd, setBorcAd,
     borcTutar, setBorcTutar,
     borcKalanTutar, setBorcKalanTutar,
+    borcTarih, setBorcTarih,
+    borcKategori, setBorcKategori,
     borcEkle, borcDuzenle, borcOde
 
 }) => {
@@ -247,6 +249,15 @@ const ModalManager = ({
     const [yeniYatirimTuruAdi, setYeniYatirimTuruAdi] = useState("");
     const [isProcessing, setIsProcessing] = useState(false); // NEW: Global loading state for modals
     const [silinecekObje, setSilinecekObje] = useState(null); // Local state for delete confirmation
+    const [borcOdemeTutarState, setBorcOdemeTutarState] = useState("");
+    const [borcSecilenHesapIdState, setBorcSecilenHesapIdState] = useState("");
+
+    useEffect(() => {
+        if (aktifModal === 'borc_ode') {
+            setBorcOdemeTutarState("");
+            setBorcSecilenHesapIdState("");
+        }
+    }, [aktifModal]);
 
     const formatPara = (tutar) => gizliMod ? "**** ₺" : formatCurrencyPlain(tutar);
 
@@ -584,7 +595,17 @@ const ModalManager = ({
             <form onSubmit={(e) => borcEkle(e).then(res => res && close())}>
                 <input placeholder="Borç Adı (Örn: Babam, Trafik Cezası)" value={borcAd || ''} onChange={e => setBorcAd(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
                 <input type="number" placeholder="Toplam Borç Tutarı (₺)" value={borcTutar || ''} onChange={e => setBorcTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
-                <input type="number" placeholder="Kalan Borç (Boşsa tamamı olur)" value={borcKalanTutar || ''} onChange={e => setBorcKalanTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
+                <input type="number" placeholder="Kalan Borç (Boşsa tamamı olur)" value={borcKalanTutar || ''} onChange={e => setBorcKalanTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
+                <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', color: '#666', marginBottom: '5px' }}>Kategori Seçin</label>
+                    <select value={borcKategori || ''} onChange={e => setBorcKategori(e.target.value)} style={inputStyle}>
+                        {(kategoriListesi || []).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', color: '#666', marginBottom: '5px' }}>Son Ödeme Tarihi (Opsiyonel)</label>
+                    <input type="date" value={borcTarih || ''} onChange={e => setBorcTarih(e.target.value)} style={inputStyle} />
+                </div>
                 <button type="submit" style={{ width: '100%', background: '#e53e3e', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>KAYDET</button>
             </form>
         );
@@ -597,7 +618,17 @@ const ModalManager = ({
             <form onSubmit={(e) => borcDuzenle(e, seciliVeri.id).then(res => res && close())}>
                 <input placeholder="Borç Adı" value={borcAd || ''} onChange={e => setBorcAd(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
                 <input type="number" placeholder="Toplam Borç Tutarı (₺)" value={borcTutar || ''} onChange={e => setBorcTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
-                <input type="number" placeholder="Kalan Borç" value={borcKalanTutar || ''} onChange={e => setBorcKalanTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} required />
+                <input type="number" placeholder="Kalan Borç" value={borcKalanTutar || ''} onChange={e => setBorcKalanTutar(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', color: '#666', marginBottom: '5px' }}>Kategori Seçin</label>
+                    <select value={borcKategori || ''} onChange={e => setBorcKategori(e.target.value)} style={inputStyle}>
+                        {(kategoriListesi || []).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', color: '#666', marginBottom: '5px' }}>Son Ödeme Tarihi (Opsiyonel)</label>
+                    <input type="date" value={borcTarih || ''} onChange={e => setBorcTarih(e.target.value)} style={inputStyle} />
+                </div>
                 <button type="submit" style={{ width: '100%', background: '#3182ce', color: 'white', padding: '14px', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>GÜNCELLE</button>
             </form>
         );
@@ -606,22 +637,20 @@ const ModalManager = ({
     else if (aktifModal === 'borc_ode') {
         title = "Borç Öde";
         icon = "💳";
-        const [odemeTutarState, setOdemeTutarState] = useState("");
-        const [secilenHesapIdState, setSecilenHesapIdState] = useState("");
 
         content = (
             <form onSubmit={async (e) => {
                 e.preventDefault();
-                if (!odemeTutarState || !secilenHesapIdState) return alert("Lütfen tutar ve hesap seçiniz.");
-                const res = await borcOde(seciliVeri, odemeTutarState, secilenHesapIdState);
+                if (!borcOdemeTutarState || !borcSecilenHesapIdState) return alert("Lütfen tutar ve hesap seçiniz.");
+                const res = await borcOde(seciliVeri, borcOdemeTutarState, borcSecilenHesapIdState);
                 if (res) close();
             }}>
                 <div style={{ marginBottom: '20px', padding: '15px', background: '#fdf2f8', borderRadius: '12px', color: '#831843' }}>
                     <p style={{ margin: 0, fontWeight: 'bold', fontSize: '16px' }}>{seciliVeri?.ad}</p>
                     <p style={{ margin: '8px 0 0 0', fontSize: '13px' }}>Kalan Borç: <b>{formatPara(seciliVeri?.kalanTutar)}</b></p>
                 </div>
-                <input type="number" autoFocus placeholder="Kaç TL ödeyeceksin?" value={odemeTutarState} onChange={e => setOdemeTutarState(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
-                <select value={secilenHesapIdState} onChange={e => setSecilenHesapIdState(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} required>
+                <input type="number" autoFocus placeholder="Kaç TL ödeyeceksin?" value={borcOdemeTutarState} onChange={e => setBorcOdemeTutarState(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} required />
+                <select value={borcSecilenHesapIdState} onChange={e => setBorcSecilenHesapIdState(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} required>
                     <option value="">Ödeme Aracı (Hangi Hesaptan?)</option>
                     {(hesaplar || []).map(h => <option key={h.id} value={h.id}>{h.hesapAdi} ({formatPara(h.guncelBakiye)})</option>)}
                 </select>

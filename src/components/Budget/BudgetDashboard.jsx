@@ -358,7 +358,9 @@ const BudgetDashboard = ({
                                     return (
                                         <div key={b.id} style={{ padding: '10px', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                                <div><b>{b.ad}</b></div>
+                                                <div>
+                                                    <b>{b.ad}</b>
+                                                </div>
                                                 <span style={{ fontWeight: 'bold' }}>{formatPara(b.kalanTutar)} <small style={{ color: '#999' }}>Kaldı</small></span>
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#666', marginBottom: '5px' }}>
@@ -366,12 +368,17 @@ const BudgetDashboard = ({
                                                 <span>Toplam: {formatPara(b.toplamTutar)}</span>
                                             </div>
                                             <div style={{ width: '100%', height: '8px', background: '#eee', borderRadius: '4px', marginBottom: '10px' }}>
-                                                <div style={{ width: `${Math.min(100, Math.max(0, yuzde))}%`, height: '100%', background: '#805ad5', borderRadius: '4px', transition: 'width 0.5s' }}></div>
+                                                <div style={{ width: `${Math.min(100, Math.max(0, yuzde))}%`, height: '100%', background: '#3182ce', borderRadius: '4px', transition: 'width 0.5s' }}></div>
                                             </div>
-                                            <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px', alignItems: 'center' }}>
-                                                <button onClick={() => modalAc('borc_ode', b)} style={{ background: '#805ad5', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}>Ödeme Yap</button>
-                                                <span onClick={() => modalAc('duzenle_borc', b)} style={{ cursor: 'pointer', fontSize: '12px' }}>✏️</span>
-                                                <span onClick={() => normalSil("borclar", b.id)} style={{ cursor: 'pointer', fontSize: '12px' }}>🗑️</span>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    {b.sonOdemeTarihi && <span style={{ fontSize: '11px', color: '#e53e3e' }}>Son Ödeme: {tarihSadeceGunAyYil(new Date(b.sonOdemeTarihi))}</span>}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                                    <button onClick={() => modalAc('borc_ode', b)} style={{ background: '#3182ce', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}>Ödeme Yap</button>
+                                                    <span onClick={() => modalAc('duzenle_borc', b)} style={{ cursor: 'pointer', fontSize: '12px' }}>✏️</span>
+                                                    <span onClick={() => normalSil("borclar", b.id)} style={{ cursor: 'pointer', fontSize: '12px' }}>🗑️</span>
+                                                </div>
                                             </div>
                                         </div>
                                     )

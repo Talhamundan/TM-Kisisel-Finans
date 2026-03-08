@@ -454,6 +454,8 @@ function App() {
                 borcAd={budgetActions.borcAd} setBorcAd={budgetActions.setBorcAd}
                 borcTutar={budgetActions.borcTutar} setBorcTutar={budgetActions.setBorcTutar}
                 borcKalanTutar={budgetActions.borcKalanTutar} setBorcKalanTutar={budgetActions.setBorcKalanTutar}
+                borcTarih={budgetActions.borcTarih} setBorcTarih={budgetActions.setBorcTarih}
+                borcKategori={budgetActions.borcKategori} setBorcKategori={budgetActions.setBorcKategori}
                 borcEkle={budgetActions.borcEkle}
                 borcDuzenle={budgetActions.borcDuzenle}
                 borcOde={budgetActions.borcOde}
@@ -475,7 +477,7 @@ function App() {
 
             <Notifications
                 bildirimler={calculations.bildirimler.filter(b => {
-                    if (anaSekme === 'butcem') return ['fatura', 'abonelik', 'maas', 'kk_hatirlatma'].includes(b.tip);
+                    if (anaSekme === 'butcem') return ['fatura', 'abonelik', 'maas', 'kk_hatirlatma', 'borc_hatirlatma'].includes(b.tip);
                     if (anaSekme === 'yatirimlar') return ['bes_odeme'].includes(b.tip);
                     if (anaSekme === 'hedefler') return ['alacak'].includes(b.tip);
                     return false;

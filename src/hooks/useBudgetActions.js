@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { collection, addDoc, doc, updateDoc, deleteDoc, increment, getDoc, query, where, getDocs, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, increment, getDoc, query, where, getDocs, setDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
@@ -57,6 +57,8 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const [borcAd, setBorcAd] = useState("");
     const [borcTutar, setBorcTutar] = useState("");
     const [borcKalanTutar, setBorcKalanTutar] = useState("");
+    const [borcTarih, setBorcTarih] = useState("");
+    const [borcKategori, setBorcKategori] = useState(kategoriListesi && kategoriListesi[0] ? kategoriListesi[0] : "");
 
     // Fatura Tanım / Giriş
     const [tanimBaslik, setTanimBaslik] = useState("");
@@ -248,10 +250,16 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
                             batch.update(taksitRef, { odenmisTaksit: increment(-1) });
                         }
 
-                        // 3. İşlemi Sil
+                        // 3. Borç Ödeme Durumu
+                        if (data.borcId) {
+                            const borcRef = doc(db, "borclar", data.borcId);
+                            batch.update(borcRef, { kalanTutar: increment(data.tutar) });
+                        }
+
+                        // 4. İşlemi Sil
                         batch.delete(docRef);
 
-                        // 4. Atomik İşlemi Uygula
+                        // 5. Atomik İşlemi Uygula
                         await batch.commit();
                         toast.success("İşlem başarıyla silindi ve bakiyeler güncellendi.");
 
@@ -492,7 +500,7 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const maasDuzenle = async (e, id) => { e.preventDefault(); await updateDoc(doc(db, "maaslar", id), { ad: maasAd, tutar: parseFloat(maasTutar), gun: maasGun, hesapId: maasHesapId }); toast.success("Gelir kalemi güncellendi."); return true; }
 
     // --- BORÇ ---
-    const borcEkle = async (e) => {
+    const borcEkle = async (e, close) => {
         if (e) e.preventDefault();
         try {
             if (!borcAd || !borcTutar) {
@@ -505,13 +513,19 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
                 return false;
             }
             const kalan = borcKalanTutar ? parseFloat(borcKalanTutar) : tutar;
-            await addDoc(collection(db, "borclar"), {
+
+            const data = {
                 uid: user.uid, alanKodu,
                 ad: borcAd, toplamTutar: tutar, kalanTutar: kalan,
+                kategori: borcKategori || "Borç Ödemesi",
                 eklenmeTarihi: new Date()
-            });
-            setBorcAd(""); setBorcTutar(""); setBorcKalanTutar("");
+            };
+            if (borcTarih) data.sonOdemeTarihi = borcTarih;
+
+            await addDoc(collection(db, "borclar"), data);
+            setBorcAd(""); setBorcTutar(""); setBorcKalanTutar(""); setBorcTarih(""); setBorcKategori(kategoriListesi && kategoriListesi[0] ? kategoriListesi[0] : "");
             toast.success("Borç tanımlandı.");
+            if (close) close();
             return true;
         } catch (err) {
             console.error(err);
@@ -520,15 +534,27 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         }
     }
 
-    const borcDuzenle = async (e, id) => {
-        e.preventDefault();
-        await updateDoc(doc(db, "borclar", id), {
-            ad: borcAd,
-            toplamTutar: parseFloat(borcTutar),
-            kalanTutar: parseFloat(borcKalanTutar)
-        });
-        toast.success("Borç güncellendi.");
-        return true;
+    const borcDuzenle = async (e, id, close) => {
+        if (e) e.preventDefault();
+        try {
+            const data = {
+                ad: borcAd,
+                toplamTutar: parseFloat(borcTutar),
+                kalanTutar: parseFloat(borcKalanTutar),
+                kategori: borcKategori || "Borç Ödemesi"
+            };
+            if (borcTarih) data.sonOdemeTarihi = borcTarih;
+            else data.sonOdemeTarihi = deleteField(); // Remove field if left empty on edit
+
+            await updateDoc(doc(db, "borclar", id), data);
+            toast.success("Borç güncellendi.");
+            if (close) close();
+            return true;
+        } catch (err) {
+            console.error(err);
+            toast.error("Güncelleme başarısız");
+            return false;
+        }
     }
 
     const borcOde = async (borc, odemeTutar, secilenHesapId) => {
@@ -538,7 +564,8 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
             await addDoc(collection(db, "nakit_islemleri"), {
                 uid: user.uid, alanKodu,
                 hesapId: secilenHesapId,
-                islemTipi: "gider", kategori: "Borç Ödemesi",
+                islemTipi: "gider", kategori: borc.kategori || "Borç Ödemesi",
+                borcId: borc.id, // Reversion için id bilgisini ekliyoruz
                 tutar: odeme, aciklama: `${borc.ad} - Borç Ödemesi`,
                 tarih: new Date()
             });
@@ -832,8 +859,8 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const fillSubscriptionForm = (v) => { setAboAd(v.ad); setAboTutar(v.tutar); setAboGun(v.gun); setAboHesapId(v.hesapId); setAboKategori(v.kategori); }
     const fillInstallmentForm = (v) => { setTaksitBaslik(v.baslik); setTaksitToplamTutar(v.toplamTutar); setTaksitSayisi(v.taksitSayisi); setTaksitHesapId(v.hesapId); setTaksitKategori(v.kategori); if (v.alisTarihi) { const d = new Date(v.alisTarihi.seconds * 1000); setTaksitAlisTarihi(d.toISOString().split('T')[0]); } }
     const fillSalaryForm = (v) => { setMaasAd(v.ad); setMaasTutar(v.tutar); setMaasGun(v.gun); setMaasHesapId(v.hesapId); }
-    const fillBorcForm = (v) => { setBorcAd(v.ad); setBorcTutar(v.toplamTutar); setBorcKalanTutar(v.kalanTutar); }
-    const resetBorcForm = () => { setBorcAd(""); setBorcTutar(""); setBorcKalanTutar(""); }
+    const fillBorcForm = (v) => { setBorcAd(v.ad); setBorcTutar(v.toplamTutar); setBorcKalanTutar(v.kalanTutar); setBorcTarih(v.sonOdemeTarihi || ""); setBorcKategori(v.kategori || (kategoriListesi && kategoriListesi[0] ? kategoriListesi[0] : "")); }
+    const resetBorcForm = () => { setBorcAd(""); setBorcTutar(""); setBorcKalanTutar(""); setBorcTarih(""); setBorcKategori(kategoriListesi && kategoriListesi[0] ? kategoriListesi[0] : ""); }
     const fillBillForm = (v) => { setFaturaGirisTutar(v.tutar); setFaturaGirisTarih(v.sonOdemeTarihi); setFaturaGirisAciklama(v.aciklama || ""); }
     const fillBillDefForm = (v) => { setTanimBaslik(v.baslik); setTanimKurum(v.kurum); setTanimAboneNo(v.aboneNo); }
     const fillCCForm = (v) => { setKkOdemeKartId(v.id); }
@@ -847,7 +874,7 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         aboAd, setAboAd, aboTutar, setAboTutar, aboGun, setAboGun, aboHesapId, setAboHesapId, aboKategori, setAboKategori,
         taksitBaslik, setTaksitBaslik, taksitToplamTutar, setTaksitToplamTutar, taksitSayisi, setTaksitSayisi, taksitHesapId, setTaksitHesapId, taksitKategori, setTaksitKategori, taksitAlisTarihi, setTaksitAlisTarihi,
         maasAd, setMaasAd, maasTutar, setMaasTutar, maasGun, setMaasGun, maasHesapId, setMaasHesapId,
-        borcAd, setBorcAd, borcTutar, setBorcTutar, borcKalanTutar, setBorcKalanTutar,
+        borcAd, setBorcAd, borcTutar, setBorcTutar, borcKalanTutar, setBorcKalanTutar, borcTarih, setBorcTarih, borcKategori, setBorcKategori,
         tanimBaslik, setTanimBaslik, tanimKurum, setTanimKurum, tanimAboneNo, setTanimAboneNo, secilenTanimId, setSecilenTanimId, faturaGirisTutar, setFaturaGirisTutar, faturaGirisTarih, setFaturaGirisTarih, faturaGirisAciklama, setFaturaGirisAciklama,
         kkOdemeKartId, setKkOdemeKartId, kkOdemeKaynakId, setKkOdemeKaynakId, kkOdemeTutar, setKkOdemeTutar,
         tasimaIslemiSuruyor, setTasimaIslemiSuruyor, yeniKodInput, setYeniKodInput,

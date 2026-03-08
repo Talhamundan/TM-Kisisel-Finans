@@ -257,7 +257,25 @@ export const useCalculations = (
             }
         });
 
-        // 5. Alacaklar (Satışlar)
+        // 5. Borçlar
+        if (borclar && borclar.length > 0) {
+            borclar.forEach(b => {
+                if (b.kalanTutar > 0 && b.sonOdemeTarihi) {
+                    const sonOdeme = new Date(b.sonOdemeTarihi);
+                    const sO = new Date(sonOdeme.setHours(0, 0, 0, 0));
+                    const bG = new Date(bugun.setHours(0, 0, 0, 0));
+                    const kalanGun = Math.ceil((sO - bG) / (1000 * 60 * 60 * 24));
+
+                    if (kalanGun < 0) {
+                        tempBildirimler.push({ id: b.id + '_borc', tip: 'borc_hatirlatma', mesaj: `🔥 ${b.ad} Borcu GECİKTİ! (${Math.abs(kalanGun)} gün)`, tutar: b.kalanTutar, data: b, renk: 'red' });
+                    } else if (kalanGun <= 5) {
+                        tempBildirimler.push({ id: b.id + '_borc', tip: 'borc_hatirlatma', mesaj: `⚠️ ${b.ad} Borcu için son ${kalanGun} gün!`, tutar: b.kalanTutar, data: b, renk: 'orange' });
+                    }
+                }
+            });
+        }
+
+        // 6. Alacaklar (Satışlar)
         if (satislar && satislar.length > 0) {
             satislar.forEach(s => {
                 const kalan = s.satisFiyati - s.tahsilEdilen;
@@ -275,7 +293,7 @@ export const useCalculations = (
         }
 
         setBildirimler(tempBildirimler);
-    }, [islemler, abonelikler, taksitler, maaslar, hesaplar, bekleyenFaturalar, tanimliFaturalar, satislar]);
+    }, [islemler, abonelikler, taksitler, maaslar, hesaplar, bekleyenFaturalar, tanimliFaturalar, satislar, borclar]);
 
     return {
         // Filters
