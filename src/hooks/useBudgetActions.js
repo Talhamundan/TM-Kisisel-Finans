@@ -879,7 +879,7 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
     const taksitEkle = async (e) => {
         if (e) e.preventDefault();
         try {
-            if (!taksitHesapId || !taksitToplamTutar || !taksitSayisi) {
+            if (!taksitHesapId || !taksitToplamTutar || !taksitSayisi || !taksitKategori) {
                 toast.error("Eksik bilgi!");
                 return false;
             }
@@ -892,13 +892,13 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
             }
 
             const aylik = toplam / sayi;
-            const secilenTaksitKategori = taksitKategori || (kategoriListesi && kategoriListesi[0]) || "Diğer";
+            const secilenTaksitKategori = taksitKategori;
             const tarih = taksitAlisTarihi ? new Date(taksitAlisTarihi) : new Date();
 
             await addDoc(collection(db, "taksitler"), { uid: user.uid, alanKodu, baslik: taksitBaslik, toplamTutar: toplam, taksitSayisi: sayi, aylikTutar: aylik, odenmisTaksit: 0, hesapId: taksitHesapId, kategori: secilenTaksitKategori, olusturmaTarihi: new Date(), alisTarihi: tarih });
 
             toast.success("Taksit planı oluşturuldu!");
-            setTaksitBaslik(""); setTaksitToplamTutar(""); setTaksitSayisi(""); setTaksitHesapId(""); setTaksitAlisTarihi("");
+            setTaksitBaslik(""); setTaksitToplamTutar(""); setTaksitSayisi(""); setTaksitHesapId(""); setTaksitKategori(""); setTaksitAlisTarihi("");
             return true;
         } catch (err) {
             console.error(err);
@@ -913,7 +913,21 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
         const yeniSayac = t.odenmisTaksit + 1;
         const commitPayment = async (shouldDelete = false) => {
             const batch = writeBatch(db);
-            batch.set(doc(collection(db, "nakit_islemleri")), { uid: user.uid, alanKodu, hesapId: t.hesapId, islemTipi: "gider", kategori: t.kategori || "Taksit", tutar: t.aylikTutar, aciklama: `${t.baslik} (${yeniSayac}/${t.taksitSayisi})`, tarih: new Date(), taksitId: t.id });
+            batch.set(doc(collection(db, "nakit_islemleri")), {
+                uid: user.uid,
+                alanKodu,
+                hesapId: t.hesapId,
+                islemTipi: "gider",
+                kategori: t.kategori || "Taksit",
+                tutar: t.aylikTutar,
+                aciklama: `${t.baslik} (${yeniSayac}/${t.taksitSayisi})`,
+                tarih: new Date(),
+                taksitId: t.id,
+                installmentId: t.id,
+                installmentNumber: yeniSayac,
+                installmentCount: t.taksitSayisi,
+                installmentPlanTitle: t.baslik,
+            });
             batch.update(doc(db, "hesaplar", t.hesapId), { guncelBakiye: increment(-t.aylikTutar) });
             if (shouldDelete) batch.delete(doc(db, "taksitler", t.id));
             else batch.update(doc(db, "taksitler", t.id), { odenmisTaksit: yeniSayac });
@@ -1411,7 +1425,21 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
             const batch = writeBatch(db);
 
             // 1. İşlemi Kaydet (Gider)
-            batch.set(doc(collection(db, "nakit_islemleri")), { uid: user.uid, alanKodu, hesapId: hesapId, islemTipi: "gider", kategori: "Fatura", tutar: fatura.tutar, aciklama: `${ad} Ödeme (${fatura.aciklama || ''})`, tarih: new Date() });
+            batch.set(doc(collection(db, "nakit_islemleri")), {
+                uid: user.uid,
+                alanKodu,
+                hesapId: hesapId,
+                islemTipi: "gider",
+                kategori: "Fatura",
+                tutar: fatura.tutar,
+                aciklama: `${ad} Ödeme (${fatura.aciklama || ''})`,
+                tarih: new Date(),
+                billId: fatura.id,
+                pendingBillId: fatura.id,
+                billDefinitionId: fatura.tanimId || "",
+                faturaTanimId: fatura.tanimId || "",
+                billTitle: ad,
+            });
 
             // 2. Bakiyeden Düş
             batch.update(doc(db, "hesaplar", hesapId), { guncelBakiye: increment(-fatura.tutar) });
@@ -1655,6 +1683,7 @@ export const useBudgetActions = (user, alanKodu, hesaplar, kategoriListesi, tani
                 "bekleyen_faturalar",
                 "fatura_tanimlari",
                 "borclar",
+                "finansmanlar",
                 "cari_islemleri",
                 "calendar_events"
             ];

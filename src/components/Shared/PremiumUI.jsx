@@ -94,15 +94,29 @@ export const TransactionRow = ({
     title,
     meta,
     tags = [],
+    badges = [],
     amount,
     amountTone,
+    balanceLabel,
+    balanceValue,
     onClick,
     actions,
 }) => (
     <div className="qw-transaction-row" onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}>
         <IconTile icon={icon} tone={tone} />
         <div className="qw-row-main">
-            <strong>{title}</strong>
+            <div className="qw-transaction-title-line">
+                <strong>{title}</strong>
+                {badges.map((badge) => {
+                    const BadgeIcon = badge.icon;
+                    return (
+                        <span key={`${badge.tone || 'neutral'}-${badge.label}`} className={`qw-transaction-nature-badge qw-transaction-nature-badge--${badge.tone || 'neutral'}`}>
+                            {BadgeIcon && <BadgeIcon size={12} strokeWidth={2.4} />}
+                            {badge.label}
+                        </span>
+                    );
+                })}
+            </div>
             <span>{meta}</span>
             {tags.length > 0 && (
                 <span className="qw-row-tags">
@@ -112,6 +126,7 @@ export const TransactionRow = ({
         </div>
         <div className="qw-row-side">
             <strong className={amountTone ? `is-${amountTone}` : ''}>{amount}</strong>
+            {balanceValue && <span>{balanceLabel ? `${balanceLabel} ${balanceValue}` : balanceValue}</span>}
             {actions && <div className="qw-row-actions">{actions}</div>}
         </div>
     </div>
@@ -151,6 +166,9 @@ export const DashboardToolbar = ({
     tagValue,
     onTagChange,
     tags = [],
+    typeValue,
+    onTypeChange,
+    typeOptions = [],
     actions,
 }) => (
     <div className="qw-dashboard-toolbar">
@@ -183,6 +201,13 @@ export const DashboardToolbar = ({
                 <option key={category} value={category}>{category}</option>
             ))}
         </select>
+        {typeOptions.length > 0 && (
+            <select className="qw-toolbar-filter-select qw-toolbar-filter-select--type" value={typeValue} onChange={(event) => onTypeChange(event.target.value)}>
+                {typeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+            </select>
+        )}
         {actions && <div className="qw-toolbar-actions">{actions}</div>}
     </div>
 );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Briefcase, Target, CalendarDays, Banknote } from 'lucide-react';
+import { Home, Briefcase, Target, CalendarDays, Banknote, Settings } from 'lucide-react';
 
 const items = [
     { id: 'butcem', label: 'Dashboard', icon: Home },
@@ -7,6 +7,7 @@ const items = [
     { id: 'yatirimlar', label: 'Yatırım', icon: Briefcase },
     { id: 'hedefler', label: 'Envanter', icon: Target },
     { id: 'takvim', label: 'Takvim', icon: CalendarDays },
+    { id: 'ayarlar', label: 'Ayarlar', icon: Settings },
 ];
 
 const MobileNav = ({ anaSekme, setAnaSekme }) => {

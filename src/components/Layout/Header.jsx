@@ -6,7 +6,7 @@ import {
     Eye,
     EyeOff,
     Home,
-    KeyRound,
+    Landmark,
     LogOut,
     Moon,
     Settings,
@@ -23,6 +23,7 @@ const navItems = [
     { id: 'butcem', label: 'Dashboard', icon: Home },
     { id: 'maasAnalizi', label: 'Maaş Analizi', icon: Banknote },
     { id: 'yatirimlar', label: 'Yatırımlar', icon: WalletCards },
+    { id: 'finansmanlar', label: 'Finansmanlar', icon: Landmark },
     { id: 'hedefler', label: 'Hedefler', icon: Target },
     { id: 'takvim', label: 'Takvim', icon: CalendarDays },
 ];
@@ -33,6 +34,8 @@ const pageMeta = {
     yatirimlar: ['Yatırımlar', 'Portföy ve varlık performansı'],
     hedefler: ['Hedefler', 'Envanter ve birikim planları'],
     takvim: ['Finans Takvimi', 'Yaklaşan hareketlerini izle'],
+    finansmanlar: ['Finansmanlar', 'Kredi ve nakit avans takibi'],
+    ayarlar: ['Ayarlar', 'Tanımlar, kategoriler ve veri yönetimi'],
 };
 
 const Header = ({
@@ -41,8 +44,6 @@ const Header = ({
     gizliMod,
     setGizliMod,
     user,
-    setAktifModal,
-    koddanCikis,
     cikisYap,
     selectedPeriod,
     setSelectedPeriod,
@@ -81,13 +82,9 @@ const Header = ({
                 </nav>
 
                 <div className="qw-sidebar-bottom">
-                    <button type="button" className="qw-nav-item" onClick={() => setAktifModal('ayarlar_yonetim')}>
+                    <button type="button" className={`qw-nav-item ${anaSekme === 'ayarlar' ? 'is-active' : ''}`} onClick={() => setAnaSekme('ayarlar')}>
                         <Settings size={19} strokeWidth={2.25} />
                         <span>Ayarlar</span>
-                    </button>
-                    <button type="button" className="qw-nav-item" onClick={koddanCikis}>
-                        <KeyRound size={19} strokeWidth={2.25} />
-                        <span>Alan Kodu</span>
                     </button>
                     <button type="button" className="qw-nav-item" onClick={cikisYap}>
                         <LogOut size={19} strokeWidth={2.25} />
@@ -160,7 +157,7 @@ const Header = ({
                             ? <Sun size={18} strokeWidth={2.25} />
                             : <Moon size={18} strokeWidth={2.25} />}
                     </button>
-                    <button type="button" className="qw-profile-pill" onClick={() => setAktifModal('ayarlar_yonetim')}>
+                    <button type="button" className="qw-profile-pill" onClick={() => setAnaSekme('ayarlar')}>
                         <span className="qw-avatar">{initial}</span>
                         <span className="hide-on-mobile">{userName}</span>
                         <UserRound className="hide-on-mobile" size={16} strokeWidth={2.25} />

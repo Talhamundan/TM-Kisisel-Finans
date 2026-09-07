@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { db } from './firebase'
-import { doc, setDoc } from 'firebase/firestore'
-import { ToastContainer } from 'react-toastify';
+import { doc, setDoc, writeBatch } from 'firebase/firestore'
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, TrendingDown, TrendingUp } from 'lucide-react';
 
@@ -10,6 +10,7 @@ import Header from './components/Layout/Header';
 import Notifications from './components/Shared/Notifications';
 import BudgetDashboard from './components/Budget/BudgetDashboard';
 import GlobalQuickTransaction from './components/Budget/GlobalQuickTransaction';
+import FinancingDashboard from './components/Financing/FinancingDashboard';
 import InvestmentDashboard from './components/Investment/InvestmentDashboard';
 import GoalsInventory from './components/Budget/GoalsInventory';
 import FinanceCalendarDashboard from './components/Calendar/FinanceCalendarDashboard';
@@ -17,6 +18,7 @@ import SalaryAnalysisDashboard from './components/Salary/SalaryAnalysisDashboard
 import ModalManager from './components/Modals/ModalManager';
 import MobileNav from './components/Layout/MobileNav';
 import AppLogo from './components/Shared/AppLogo';
+import SettingsDashboard from './components/Settings/SettingsDashboard';
 import { useDefaultPaymentAccount } from './utils/defaultPaymentAccount';
 
 // Hooks
@@ -29,8 +31,39 @@ import Feedback from './components/Feedback';
 
 
 // Helpers
-import { formatMoneyInputValue, inputStyle } from './utils/helpers';
-import { buildAvailablePeriods, getDefaultPeriod, getLatestAvailablePeriod, isDateInPeriod, isPeriodAvailable, readInitialPeriod } from './utils/period';
+import { formatMoneyInputValue, inputStyle, toDateSafe } from './utils/helpers';
+import { buildAvailablePeriods, getDefaultPeriod, getLatestAvailablePeriod, isPeriodAvailable, readInitialPeriod } from './utils/period';
+
+const normalizeCategoryKey = (value) => String(value || '')
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLocaleLowerCase('tr-TR');
+
+const cleanCategoryName = (value) => String(value || '')
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const mergeCategoryList = (categories = []) => {
+    const seen = new Set();
+    return categories.reduce((list, category) => {
+        const name = cleanCategoryName(category);
+        const key = normalizeCategoryKey(name);
+        if (!name || seen.has(key)) return list;
+        seen.add(key);
+        list.push(name);
+        return list;
+    }, []);
+};
+
+const isDueBySelectedPeriodEnd = (dateLike, period) => {
+    if (!period || period.month === 'all') return true;
+    const date = toDateSafe(dateLike);
+    if (!date) return true;
+    const periodEnd = new Date(Number(period.year), Number(period.month), 0, 23, 59, 59, 999);
+    return date.getTime() <= periodEnd.getTime();
+};
 
 const getInitialTheme = () => {
     if (typeof window === 'undefined') return 'light';
@@ -41,12 +74,19 @@ const getInitialTheme = () => {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
+const getInitialTab = () => (
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/finansmanlar')
+        ? 'finansmanlar'
+        : 'butcem'
+);
+
 function App() {
     // 1. AUTH
     const { user, loading, girisYap, cikisYap: authLogout } = useAuth();
 
     // 2. LOCAL UI STATE
-    const [anaSekme, setAnaSekme] = useState("butcem");
+    const [anaSekme, setAnaSekme] = useState(getInitialTab);
+    const [routePath, setRoutePath] = useState(() => (typeof window === 'undefined' ? '/' : window.location.pathname));
     const [gizliMod, setGizliMod] = useState(false);
     const [aktifModal, setAktifModal] = useState(null);
     const [seciliVeri, setSeciliVeri] = useState(null);
@@ -71,6 +111,42 @@ function App() {
     const investmentActions = useInvestmentActions(user, alanKodu);
     const defaultPaymentAccount = useDefaultPaymentAccount(data.hesaplar);
     const defaultPaymentAccountId = defaultPaymentAccount?.id || "";
+    const selectedFinancingId = routePath.match(/^\/finansmanlar\/([^/]+)/)?.[1] || null;
+
+    const navigateTo = (path) => {
+        const url = new URL(window.location.href);
+        url.pathname = path;
+        window.history.pushState({}, '', `${url.pathname}${url.search}`);
+        setRoutePath(path);
+        setAnaSekme(path.startsWith('/finansmanlar') ? 'finansmanlar' : 'butcem');
+    };
+
+    const changeTab = (tab) => {
+        setAnaSekme(tab);
+        if (tab === 'finansmanlar') {
+            const url = new URL(window.location.href);
+            url.pathname = '/finansmanlar';
+            window.history.pushState({}, '', `${url.pathname}${url.search}`);
+            setRoutePath('/finansmanlar');
+            return;
+        }
+        if (window.location.pathname.startsWith('/finansmanlar')) {
+            const url = new URL(window.location.href);
+            url.pathname = '/';
+            window.history.pushState({}, '', `${url.pathname}${url.search}`);
+            setRoutePath('/');
+        }
+    };
+
+    useEffect(() => {
+        const handlePopState = () => {
+            const path = window.location.pathname;
+            setRoutePath(path);
+            setAnaSekme(path.startsWith('/finansmanlar') ? 'finansmanlar' : 'butcem');
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
 
     useEffect(() => {
         const current = getDefaultPeriod();
@@ -102,6 +178,7 @@ function App() {
             ...data.islemler.map((item) => item.tarih),
             ...data.bekleyenFaturalar.map((item) => item.sonOdemeTarihi || item.tarih),
             ...data.borclar.map((item) => item.sonOdemeTarihi),
+            ...data.finansmanlar.map((item) => item.usageDate || item.closureDate),
             ...data.cariIslemler.map((item) => item.sonOdemeTarihi || item.tarih),
         ];
         const periods = buildAvailablePeriods(dates);
@@ -112,7 +189,7 @@ function App() {
             years: [fallback.year],
             monthsByYear: { [fallback.year]: [fallback.month] },
         };
-    }, [data.islemler, data.bekleyenFaturalar, data.borclar, data.cariIslemler]);
+    }, [data.islemler, data.bekleyenFaturalar, data.borclar, data.finansmanlar, data.cariIslemler]);
 
     useEffect(() => {
         if (!availablePeriods.years.length) return;
@@ -165,11 +242,11 @@ function App() {
     }, [selectedPeriod]);
 
     const filteredPendingBills = data.bekleyenFaturalar.filter((bill) => (
-        isDateInPeriod(bill.sonOdemeTarihi, selectedPeriod)
+        isDueBySelectedPeriodEnd(bill.sonOdemeTarihi, selectedPeriod)
     ));
 
     const filteredDebts = data.borclar.filter((debt) => (
-        debt.sonOdemeTarihi ? isDateInPeriod(debt.sonOdemeTarihi, selectedPeriod) : true
+        isDueBySelectedPeriodEnd(debt.sonOdemeTarihi, selectedPeriod)
     ));
 
     // Sekme değişince sayfayı en üste al (scroll container: #root)
@@ -265,14 +342,142 @@ function App() {
         data.setAylikLimit(limit);
         setDoc(doc(db, "ayarlar", alanKodu), { limit: limit }, { merge: true });
     }
-    const onKategoriUpdate = (y) => {
-        data.setKategoriListesi(y);
-        setDoc(doc(db, "ayarlar", alanKodu), { kategoriler: y }, { merge: true });
+    const commitCategoryReferenceUpdates = async (updates) => {
+        for (let i = 0; i < updates.length; i += 450) {
+            const batch = writeBatch(db);
+            updates.slice(i, i + 450).forEach(({ collectionName, id, kategori: nextCategory }) => {
+                batch.update(doc(db, collectionName, id), { kategori: nextCategory });
+            });
+            await batch.commit();
+        }
+    };
+
+    const onKategoriUpdate = async (y) => {
+        const nextCategories = mergeCategoryList(y);
+        data.setKategoriListesi(nextCategories);
+        await setDoc(doc(db, "ayarlar", alanKodu), { kategoriler: nextCategories }, { merge: true });
     }
-    const onYatirimTuruUpdate = (y) => {
-        data.setYatirimTurleri(y);
-        setDoc(doc(db, "ayarlar", alanKodu), { yatirimTurleri: y }, { merge: true });
+
+    const onKategoriRename = async (oldName, newName) => {
+        const from = cleanCategoryName(oldName);
+        const to = cleanCategoryName(newName);
+        if (!from || !to) {
+            toast.warning("Kategori adlarını doldurun.");
+            return false;
+        }
+        if (normalizeCategoryKey(from) === normalizeCategoryKey(to)) {
+            toast.info("Kategori adı değişmedi.");
+            return false;
+        }
+
+        const categoryCollections = [
+            { collectionName: "nakit_islemleri", items: data.islemler },
+            { collectionName: "abonelikler", items: data.abonelikler },
+            { collectionName: "taksitler", items: data.taksitler },
+            { collectionName: "borclar", items: data.borclar },
+            { collectionName: "cari_islemleri", items: data.cariIslemler },
+        ];
+        const updates = categoryCollections.flatMap(({ collectionName, items }) => (
+            (items || [])
+                .filter((item) => item.id && normalizeCategoryKey(item.kategori) === normalizeCategoryKey(from))
+                .map((item) => ({ collectionName, id: item.id, kategori: to }))
+        ));
+        const nextCategories = mergeCategoryList((data.kategoriListesi || []).map((category) => (
+            normalizeCategoryKey(category) === normalizeCategoryKey(from) ? to : category
+        )).concat(to));
+
+        await setDoc(doc(db, "ayarlar", alanKodu), { kategoriler: nextCategories }, { merge: true });
+        data.setKategoriListesi(nextCategories);
+        await commitCategoryReferenceUpdates(updates);
+        toast.success(`${updates.length} kayıt "${to}" kategorisine güncellendi.`);
+        return true;
+    };
+
+    const onBulkCategoryMove = async ({ fromCategory, toCategory, descriptionFilter, transactionIds }) => {
+        const from = cleanCategoryName(fromCategory);
+        const to = cleanCategoryName(toCategory);
+        const filter = cleanCategoryName(descriptionFilter);
+        const ids = Array.isArray(transactionIds) ? transactionIds.filter(Boolean) : [];
+        if (!to) {
+            toast.warning("Hedef kategori seçin.");
+            return false;
+        }
+        if (!ids.length && !from) {
+            toast.warning("Kaynak kategori seçin.");
+            return false;
+        }
+        if (!ids.length && normalizeCategoryKey(from) === normalizeCategoryKey(to)) {
+            toast.info("Kaynak ve hedef kategori aynı.");
+            return false;
+        }
+
+        const normalizedFilter = normalizeCategoryKey(filter);
+        const updates = (data.islemler || [])
+            .filter((item) => {
+                if (ids.length > 0) return item.id && ids.includes(item.id);
+                if (!item.id || normalizeCategoryKey(item.kategori) !== normalizeCategoryKey(from)) return false;
+                if (!normalizedFilter) return true;
+                return normalizeCategoryKey(item.aciklama).includes(normalizedFilter);
+            })
+            .filter((item) => normalizeCategoryKey(item.kategori) !== normalizeCategoryKey(to))
+            .map((item) => ({ collectionName: "nakit_islemleri", id: item.id, kategori: to }));
+
+        if (updates.length === 0) {
+            toast.info("Taşınacak işlem bulunamadı.");
+            return false;
+        }
+
+        const nextCategories = mergeCategoryList([...(data.kategoriListesi || []), to]);
+        await setDoc(doc(db, "ayarlar", alanKodu), { kategoriler: nextCategories }, { merge: true });
+        data.setKategoriListesi(nextCategories);
+        await commitCategoryReferenceUpdates(updates);
+        toast.success(`${updates.length} işlem "${to}" kategorisine taşındı.`);
+        return true;
+    };
+    const onYatirimTuruUpdate = async (y) => {
+        const nextTypes = mergeCategoryList(y);
+        data.setYatirimTurleri(nextTypes);
+        await setDoc(doc(db, "ayarlar", alanKodu), { yatirimTurleri: nextTypes }, { merge: true });
     }
+
+    const onYatirimTuruRename = async (oldName, newName) => {
+        const from = cleanCategoryName(oldName);
+        const to = cleanCategoryName(newName);
+        if (!from || !to) {
+            toast.warning("Tür adlarını doldurun.");
+            return false;
+        }
+        if (normalizeCategoryKey(from) === normalizeCategoryKey(to)) {
+            toast.info("Tür adı değişmedi.");
+            return false;
+        }
+
+        const updates = [
+            ...(data.portfoy || [])
+                .filter((item) => item.id && normalizeCategoryKey(item.varlikTuru) === normalizeCategoryKey(from))
+                .map((item) => ({ collectionName: "portfoy", id: item.id, field: "varlikTuru", value: to })),
+            ...(data.islemler || [])
+                .filter((item) => item.id && normalizeCategoryKey(item.yatirimTuru) === normalizeCategoryKey(from))
+                .map((item) => ({ collectionName: "nakit_islemleri", id: item.id, field: "yatirimTuru", value: to })),
+        ];
+
+        const nextTypes = mergeCategoryList((data.yatirimTurleri || []).map((type) => (
+            normalizeCategoryKey(type) === normalizeCategoryKey(from) ? to : type
+        )).concat(to));
+        await setDoc(doc(db, "ayarlar", alanKodu), { yatirimTurleri: nextTypes }, { merge: true });
+        data.setYatirimTurleri(nextTypes);
+
+        for (let i = 0; i < updates.length; i += 450) {
+            const batch = writeBatch(db);
+            updates.slice(i, i + 450).forEach(({ collectionName, id, field, value }) => {
+                batch.update(doc(db, collectionName, id), { [field]: value });
+            });
+            await batch.commit();
+        }
+
+        toast.success(`${updates.length} yatırım kaydı "${to}" olarak güncellendi.`);
+        return true;
+    };
 
     const quickTransactionFormProps = {
         formTab, setFormTab,
@@ -676,6 +881,8 @@ function App() {
                 secilenHesapId={budgetActions.secilenHesapId} setSecilenHesapId={budgetActions.setSecilenHesapId}
                 defaultPaymentAccountId={defaultPaymentAccountId}
                 onKategoriUpdate={onKategoriUpdate}
+                onKategoriRename={onKategoriRename}
+                onBulkCategoryMove={onBulkCategoryMove}
                 onYatirimTuruUpdate={onYatirimTuruUpdate}
                 ensureTag={budgetActions.ensureTag}
                 renameTag={budgetActions.renameTag}
@@ -719,17 +926,15 @@ function App() {
 
             <Header
                 anaSekme={anaSekme}
-                setAnaSekme={setAnaSekme}
+                setAnaSekme={changeTab}
                 gizliMod={gizliMod}
                 setGizliMod={setGizliMod}
                 user={user}
-                setAktifModal={setAktifModal}
-                koddanCikis={koddanCikis}
                 cikisYap={cikisYap}
                 selectedPeriod={selectedPeriod}
                 setSelectedPeriod={setSelectedPeriod}
                 availablePeriods={availablePeriods}
-                showPeriodFilter={!['hedefler', 'takvim', 'maasAnalizi'].includes(anaSekme)}
+                showPeriodFilter={!['hedefler', 'takvim', 'maasAnalizi', 'ayarlar', 'finansmanlar'].includes(anaSekme)}
                 theme={theme}
                 onThemeToggle={() => setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark')}
             />
@@ -850,6 +1055,8 @@ function App() {
                     faturaGirisAciklama={budgetActions.faturaGirisAciklama} setFaturaGirisAciklama={budgetActions.setFaturaGirisAciklama}
 
                     borclar={filteredDebts}
+                    finansmanlar={data.finansmanlar}
+                    navigateTo={navigateTo}
                     toplamKalanBorc={calculations.toplamKalanBorc}
                     borcOde={budgetActions.borcOde}
                     borcDuzenle={budgetActions.borcDuzenle}
@@ -858,7 +1065,47 @@ function App() {
                     excelIndir={() => budgetActions.excelIndir(data.islemler)}
                     excelYukle={budgetActions.excelYukle}
                     islemSil={budgetActions.islemSil}
-                    setAnaSekme={setAnaSekme}
+                    setAnaSekme={changeTab}
+                />
+            )}
+
+            {anaSekme === "finansmanlar" && (
+                <FinancingDashboard
+                    user={user}
+                    alanKodu={alanKodu}
+                    financings={data.finansmanlar}
+                    hesaplar={data.hesaplar}
+                    taksitler={data.taksitler}
+                    islemler={data.islemler}
+                    gizliMod={gizliMod}
+                    selectedFinancingId={selectedFinancingId}
+                    navigateTo={navigateTo}
+                />
+            )}
+
+            {anaSekme === "ayarlar" && (
+                <SettingsDashboard
+                    aylikLimit={data.aylikLimit}
+                    onLimitChange={onLimitChange}
+                    kategoriListesi={data.kategoriListesi}
+                    tumIslemler={data.islemler}
+                    onKategoriUpdate={onKategoriUpdate}
+                    onKategoriRename={onKategoriRename}
+                    onBulkCategoryMove={onBulkCategoryMove}
+                    etiketler={data.etiketler}
+                    ensureTag={budgetActions.ensureTag}
+                    renameTag={budgetActions.renameTag}
+                    deleteTag={budgetActions.deleteTag}
+                    yatirimTurleri={data.yatirimTurleri}
+                    onYatirimTuruUpdate={onYatirimTuruUpdate}
+                    onYatirimTuruRename={onYatirimTuruRename}
+                    alanKodu={alanKodu}
+                    koddanCikis={koddanCikis}
+                    verileriTasi={budgetActions.verileriTasi}
+                    yeniKodInput={budgetActions.yeniKodInput}
+                    setYeniKodInput={budgetActions.setYeniKodInput}
+                    tasimaIslemiSuruyor={budgetActions.tasimaIslemiSuruyor}
+                    gizliMod={gizliMod}
                 />
             )}
 
@@ -969,7 +1216,7 @@ function App() {
             {/* Mobil Alt Navigasyon Barı */}
             <MobileNav
                 anaSekme={anaSekme}
-                setAnaSekme={setAnaSekme}
+                setAnaSekme={changeTab}
                 modalAc={modalAc}
             />
         </div>

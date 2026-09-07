@@ -315,6 +315,8 @@ const ModalManager = ({
     // yeniKategoriAdi, setYeniKategoriAdi, -> MOVED TO LOCAL STATE
     // yeniYatirimTuruAdi, setYeniYatirimTuruAdi, -> MOVED TO LOCAL STATE
     onKategoriUpdate, // Replaces inline setDoc
+    onKategoriRename,
+    onBulkCategoryMove,
     onYatirimTuruUpdate, // Replaces inline setDoc
     ensureTag,
     renameTag,
@@ -357,10 +359,25 @@ const ModalManager = ({
     const [borcOdemeTutarState, setBorcOdemeTutarState] = useState("");
     const [borcSecilenHesapIdState, setBorcSecilenHesapIdState] = useState("");
     const [butceLimitInput, setButceLimitInput] = useState(aylikLimit || "");
+    const [duzenlenenKategori, setDuzenlenenKategori] = useState("");
+    const [kategoriYeniAd, setKategoriYeniAd] = useState("");
+    const [tasimaKaynakKategori, setTasimaKaynakKategori] = useState("");
+    const [tasimaHedefKategori, setTasimaHedefKategori] = useState("");
+    const [tasimaAciklamaFiltresi, setTasimaAciklamaFiltresi] = useState("");
 
     useEffect(() => {
         setButceLimitInput(aylikLimit || "");
     }, [aylikLimit]);
+
+    useEffect(() => {
+        if (aktifModal !== 'ayarlar_yonetim') return;
+        const firstCategory = sortTurkishText(kategoriListesi || [])[0] || "";
+        setDuzenlenenKategori(current => current || firstCategory);
+        setKategoriYeniAd("");
+        setTasimaKaynakKategori(current => current || firstCategory);
+        setTasimaHedefKategori(current => current || firstCategory);
+        setTasimaAciklamaFiltresi("");
+    }, [aktifModal, kategoriListesi]);
 
     useEffect(() => {
         if (aktifModal === 'borc_ode') {
@@ -395,6 +412,13 @@ const ModalManager = ({
     let customMinHeight = undefined;
     const siraliKategoriListesi = sortTurkishText(kategoriListesi || []);
     const gelirTurleri = ["Maaş", "Maaş Avansı", "Prim / İkramiye", "Masraf İadesi", "Diğer Gelir"];
+    const normalizeCategorySearch = (value) => String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR');
+    const topluTasimaAdedi = (tumIslemler || []).filter((item) => {
+        if (normalizeCategorySearch(item?.kategori) !== normalizeCategorySearch(tasimaKaynakKategori)) return false;
+        const filter = normalizeCategorySearch(tasimaAciklamaFiltresi);
+        if (!filter) return true;
+        return normalizeCategorySearch(item?.aciklama).includes(filter);
+    }).length;
     const creditCardPaymentSettings = hesapTipi === 'krediKarti' && (
         <div style={{ marginBottom: '20px' }}>
             <FieldLabel>Ödeme stratejisi</FieldLabel>
@@ -1010,7 +1034,7 @@ const ModalManager = ({
     else if (aktifModal === 'ayarlar_yonetim') {
         title = <span>Ayarlar</span>;
         icon = "⚙️";
-        customWidth = "380px";
+        customWidth = "min(520px, calc(100vw - 32px))";
         customMinHeight = "550px";
 
         const tagStyle = (bg) => ({
@@ -1096,14 +1120,106 @@ const ModalManager = ({
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
                     {siraliKategoriListesi.map(k => (
                         <span key={k} style={tagStyle('#f0fff4')}>
-                            {k} <span onClick={() => setSilinecekObje({ type: 'kategori', name: k })} style={{ cursor: 'pointer', color: '#e53e3e', fontWeight: 'bold', fontSize: '12px' }}>X</span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDuzenlenenKategori(k);
+                                    setKategoriYeniAd(k);
+                                    setTasimaKaynakKategori(k);
+                                }}
+                                style={{ border: 'none', background: 'transparent', padding: 0, color: '#111827', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+                                title="Düzenle veya taşı"
+                            >
+                                {k}
+                            </button>
+                            <span onClick={() => setSilinecekObje({ type: 'kategori', name: k })} style={{ cursor: 'pointer', color: '#e53e3e', fontWeight: 'bold', fontSize: '12px' }}>X</span>
                         </span>
                     ))}
                 </div>
-                <form onSubmit={(e) => { e.preventDefault(); if (!yeniKategoriAdi) return; onKategoriUpdate([...(kategoriListesi || []), yeniKategoriAdi]); setYeniKategoriAdi(""); toast.success("Kategori eklendi"); }} style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                <form onSubmit={async (e) => { e.preventDefault(); if (!yeniKategoriAdi) return; await onKategoriUpdate([...(kategoriListesi || []), yeniKategoriAdi]); setYeniKategoriAdi(""); toast.success("Kategori eklendi"); }} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <input value={yeniKategoriAdi} onChange={e => setYeniKategoriAdi(e.target.value)} placeholder="Yeni Kategori" style={{ ...inputStyle, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px' }} />
                     <button type="submit" style={{ padding: '0 16px', borderRadius: '8px', border: 'none', background: 'green', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}>Ekle</button>
                 </form>
+                <div style={{ padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '12px' }}>
+                    <h5 style={{ margin: '0 0 10px', color: '#334155', fontSize: '12px' }}>Kategori adını düzenle</h5>
+                    <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const nextName = kategoriYeniAd.trim();
+                        if (!duzenlenenKategori || !nextName) return toast.warning("Kategori seçin ve yeni ad girin.");
+                        const result = await Swal.fire({
+                            title: 'Kategori güncellensin mi?',
+                            text: `"${duzenlenenKategori}" kategorisi, bağlı kayıtlarla birlikte "${nextName}" olarak güncellenecek.`,
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Güncelle',
+                            cancelButtonText: 'İptal',
+                            zIndex: 200000
+                        });
+                        if (!result.isConfirmed) return;
+                        setIsProcessing(true);
+                        try {
+                            const ok = await onKategoriRename?.(duzenlenenKategori, nextName);
+                            if (ok) {
+                                setDuzenlenenKategori(nextName);
+                                setKategoriYeniAd("");
+                            }
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px' }}>
+                        <select value={duzenlenenKategori} onChange={e => { setDuzenlenenKategori(e.target.value); setKategoriYeniAd(e.target.value); }} style={{ ...inputStyle, background: 'white', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px' }}>
+                            <option value="">Kategori seç</option>
+                            {siraliKategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}
+                        </select>
+                        <input value={kategoriYeniAd} onChange={e => setKategoriYeniAd(e.target.value)} placeholder="Yeni ad" style={{ ...inputStyle, background: 'white', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px' }} />
+                        <button type="submit" disabled={isProcessing} style={{ padding: '0 12px', borderRadius: '8px', border: 'none', background: '#0f766e', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '11px' }}>{isProcessing ? '...' : 'Düzenle'}</button>
+                    </form>
+                </div>
+                <div style={{ padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '20px' }}>
+                    <h5 style={{ margin: '0 0 10px', color: '#334155', fontSize: '12px' }}>Toplu kategori taşı</h5>
+                    <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!tasimaKaynakKategori || !tasimaHedefKategori) return toast.warning("Kaynak ve hedef kategori seçin.");
+                        const result = await Swal.fire({
+                            title: 'İşlemler taşınsın mı?',
+                            text: `${topluTasimaAdedi} işlem "${tasimaKaynakKategori}" kategorisinden "${tasimaHedefKategori}" kategorisine taşınacak.`,
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Taşı',
+                            cancelButtonText: 'İptal',
+                            zIndex: 200000
+                        });
+                        if (!result.isConfirmed) return;
+                        setIsProcessing(true);
+                        try {
+                            await onBulkCategoryMove?.({
+                                fromCategory: tasimaKaynakKategori,
+                                toCategory: tasimaHedefKategori,
+                                descriptionFilter: tasimaAciklamaFiltresi,
+                            });
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    }} style={{ display: 'grid', gap: '8px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <select value={tasimaKaynakKategori} onChange={e => setTasimaKaynakKategori(e.target.value)} style={{ ...inputStyle, background: 'white', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px' }}>
+                                <option value="">Nereden?</option>
+                                {siraliKategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}
+                            </select>
+                            <select value={tasimaHedefKategori} onChange={e => setTasimaHedefKategori(e.target.value)} style={{ ...inputStyle, background: 'white', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px' }}>
+                                <option value="">Nereye?</option>
+                                {siraliKategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}
+                            </select>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'center' }}>
+                            <input value={tasimaAciklamaFiltresi} onChange={e => setTasimaAciklamaFiltresi(e.target.value)} placeholder="Açıklama içerir (örn. Hancı)" style={{ ...inputStyle, background: 'white', border: '1px solid #e2e8f0', fontSize: '12px', padding: '8px' }} />
+                            <button type="submit" disabled={isProcessing || topluTasimaAdedi === 0} style={{ padding: '9px 14px', borderRadius: '8px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 'bold', cursor: topluTasimaAdedi === 0 ? 'not-allowed' : 'pointer', fontSize: '11px', opacity: topluTasimaAdedi === 0 ? 0.55 : 1 }}>{isProcessing ? '...' : 'Taşı'}</button>
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '11px' }}>
+                            Eşleşen işlem: <b>{topluTasimaAdedi}</b>
+                        </div>
+                    </form>
+                </div>
 
                 {/* 2. YATIRIM TÜRLERİ */}
                 <h4 style={{ margin: '0 0 10px 0', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', opacity: 0.8 }}>💎 Yatırım Türleri</h4>

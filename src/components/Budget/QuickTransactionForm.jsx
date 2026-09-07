@@ -431,7 +431,8 @@ const QuickTransactionForm = ({
                         <input type="number" placeholder="Kaç taksit?" value={taksitSayisi} onChange={e => setTaksitSayisi(e.target.value)} style={inputStyle} required />
                     </div>
                     <div className="qw-form-row">
-                        <select value={taksitKategori || (siraliKategoriListesi && siraliKategoriListesi[0])} onChange={e => setTaksitKategori(e.target.value)} style={inputStyle}>
+                        <select value={taksitKategori || ''} onChange={e => setTaksitKategori(e.target.value)} style={inputStyle} required>
+                            <option value="">Kategori seçiniz</option>
                             {siraliKategoriListesi.map(k => <option key={k} value={k}>{k}</option>)}
                         </select>
                         <input type="date" value={taksitAlisTarihi} onChange={e => setTaksitAlisTarihi(e.target.value)} style={inputStyle} />

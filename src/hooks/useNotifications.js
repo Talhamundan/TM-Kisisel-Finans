@@ -255,12 +255,15 @@ export const useNotifications = ({
             const kalanGun = Math.ceil((sonrakiVade - today0) / (1000 * 60 * 60 * 24));
             if (kalanGun > NOTIFICATION_WINDOW_DAYS) return;
 
+            const siradakiTaksit = odenmisTaksit + 1;
+            const taksitEtiketi = `${siradakiTaksit}. taksiti`;
+
             tempBildirimler.push({
-                id: `${taksit.id}_taksit_${odenmisTaksit + 1}`,
+                id: `${taksit.id}_taksit_${siradakiTaksit}`,
                 tip: 'taksit',
-                mesaj: dueMessage({ name: `${taksit.baslik} taksiti`, daysLeft: kalanGun, overdueText: 'ödenmedi' }),
+                mesaj: dueMessage({ name: `${taksit.baslik} ${taksitEtiketi}`, daysLeft: kalanGun, overdueText: 'ödenmedi' }),
                 tutar: parseFloat(taksit.aylikTutar) || 0,
-                data: { ...taksit, odenmisTaksit },
+                data: { ...taksit, odenmisTaksit, nextInstallmentNumber: siradakiTaksit, installmentCount: taksitSayisi },
                 renk: kalanGun < 0 ? 'red' : 'orange'
             });
         });

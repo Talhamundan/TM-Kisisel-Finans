@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import {
     ArrowDownRight,
+    ArrowRight,
     ArrowUpRight,
     Bell,
     CalendarClock,
@@ -14,6 +15,7 @@ import {
     Download,
     Edit3,
     Landmark,
+    Layers,
     LineChart,
     Plus,
     ReceiptText,
@@ -50,6 +52,14 @@ import {
 import QuickTransactionForm from './QuickTransactionForm';
 import { getCreditCardPaymentPlan, isCreditCardPaymentTransaction, isCreditCardStatementPaymentTransaction } from '../../utils/creditCardPayments';
 import { buildSubscriptionOccurrences } from '../../utils/recurringPayments';
+import {
+    FINANCING_STATUS,
+    formatFinancingMoney,
+    formatShortDate,
+    getFinancingMetrics,
+    getFinancingTypeLabel,
+    summarizeFinancings,
+} from '../../utils/financing';
 
 const parseAmount = (value) => parseFloat(value) || 0;
 
@@ -320,6 +330,18 @@ const isCreditCardCashOutTransaction = (transaction, accounts = []) => (
     ))
 );
 
+const matchesTransactionNatureFilter = (transaction, filterValue, accounts = []) => {
+    if (filterValue === 'all') return true;
+    if (filterValue === 'income') return transaction.islemTipi === 'gelir';
+    if (filterValue === 'expense') {
+        return transaction.islemTipi === 'gider' || isCreditCardCashOutTransaction(transaction, accounts);
+    }
+    if (filterValue === 'transfer') {
+        return transaction.islemTipi === 'transfer' && !isCreditCardCashOutTransaction(transaction, accounts);
+    }
+    return transaction.presentation?.type === filterValue;
+};
+
 const isSameCalendarDay = (date, target) => (
     date &&
     date.getDate() === target.getDate() &&
@@ -332,6 +354,30 @@ const isSameCalendarMonth = (date, target) => (
     date.getMonth() === target.getMonth() &&
     date.getFullYear() === target.getFullYear()
 );
+
+const getSelectedPeriodEnd = (period) => {
+    if (!period || period.month === 'all') return null;
+    return new Date(Number(period.year), Number(period.month), 0, 23, 59, 59, 999);
+};
+
+const isDueBySelectedPeriodEnd = (date, period) => {
+    if (!period || period.month === 'all') return true;
+    const dueDate = toDateSafe(date);
+    if (!dueDate) return true;
+    return dueDate.getTime() <= getSelectedPeriodEnd(period).getTime();
+};
+
+const TRANSACTION_NATURE_OPTIONS = [
+    { value: 'all', label: 'Tüm işlemler' },
+    { value: 'income', label: 'Gelir' },
+    { value: 'expense', label: 'Gider' },
+    { value: 'transfer', label: 'Transfer' },
+    { value: 'normal', label: 'Normal işlemler' },
+    { value: 'installment', label: 'Taksitler' },
+    { value: 'subscription', label: 'Abonelikler' },
+    { value: 'bill', label: 'Faturalar' },
+    { value: 'fixed', label: 'Sabit giderler' },
+];
 
 const getMonthlyDueDate = (item, year, month) => {
     const explicitDate = toDateSafe(item?.sonOdemeTarihi || item?.tarih || item?.vadeTarihi);
@@ -414,6 +460,8 @@ const BudgetDashboard = ({
     filtreKategori, setFiltreKategori,
     filtreEtiket, setFiltreEtiket,
     borclar,
+    finansmanlar = [],
+    navigateTo,
     maaslar = [],
     excelIndir,
     excelYukle,
@@ -424,6 +472,7 @@ const BudgetDashboard = ({
     const [salaryHistoryMode, setSalaryHistoryMode] = useState('calendar');
     const [flowChartMode, setFlowChartMode] = useState('expense');
     const [hiddenExpenseCategories, setHiddenExpenseCategories] = useState(() => new Set());
+    const [transactionNatureFilter, setTransactionNatureFilter] = useState('all');
     const isNestedModalOpen = Boolean(historyAccount && aktifModal);
     const formatPara = (tutar) => gizliMod ? '****' : formatCurrencyPlain(parseAmount(tutar));
     const siraliKategoriListesi = sortTurkishText(kategoriListesi || []);
@@ -442,6 +491,71 @@ const BudgetDashboard = ({
             String(a.name || '').localeCompare(String(b.name || ''), 'tr-TR', { sensitivity: 'base' })
         );
     }, [tumIslemler]);
+    const installmentById = useMemo(() => new Map((taksitler || []).map((item) => [item.id, item])), [taksitler]);
+    const subscriptionById = useMemo(() => new Map((abonelikler || []).map((item) => [item.id, item])), [abonelikler]);
+    const pendingBillById = useMemo(() => new Map((bekleyenFaturalar || []).map((item) => [item.id, item])), [bekleyenFaturalar]);
+    const billDefinitionById = useMemo(() => new Map((tanimliFaturalar || []).map((item) => [item.id, item])), [tanimliFaturalar]);
+
+    const getTransactionNature = useCallback((transaction) => {
+        const installmentId = transaction?.taksitId
+            || transaction?.installmentId
+            || transaction?.installmentPlanId
+            || transaction?.planId;
+        if (installmentId) {
+            const installment = installmentById.get(installmentId);
+            const number = parseInt(transaction?.installmentNumber || transaction?.taksitNo || transaction?.taksitSirasi);
+            const count = parseInt(transaction?.installmentCount || transaction?.taksitSayisi || installment?.taksitSayisi);
+            return {
+                type: 'installment',
+                title: installment?.baslik || transaction?.installmentPlanTitle || transaction?.aciklama || transaction?.kategori || 'Taksit',
+                badges: [{
+                    label: number > 0 && count > 0 ? `Taksit ${number}/${count}` : 'Taksit',
+                    tone: 'installment',
+                    icon: Layers,
+                }],
+            };
+        }
+
+        const subscriptionId = transaction?.subscriptionId || transaction?.bagliAbonelikId || transaction?.abonelikId;
+        if (subscriptionId) {
+            const subscription = subscriptionById.get(subscriptionId);
+            return {
+                type: 'subscription',
+                title: subscription?.ad || transaction?.subscriptionTitle || transaction?.aciklama || transaction?.kategori || 'Abonelik',
+                badges: [{ label: 'Abonelik', tone: 'subscription', icon: Repeat2 }],
+            };
+        }
+
+        const billId = transaction?.billId || transaction?.faturaId || transaction?.pendingBillId || transaction?.bekleyenFaturaId;
+        const billDefinitionId = transaction?.billDefinitionId || transaction?.faturaTanimId || transaction?.tanimId;
+        if (billId || billDefinitionId) {
+            const bill = pendingBillById.get(billId);
+            const definition = billDefinitionById.get(billDefinitionId || bill?.tanimId);
+            return {
+                type: 'bill',
+                title: transaction?.billTitle || bill?.baslik || definition?.baslik || definition?.kurum || transaction?.aciklama || 'Fatura',
+                badges: [{ label: 'Fatura', tone: 'bill', icon: ReceiptText }],
+            };
+        }
+
+        const recurringId = transaction?.recurringDefinitionId
+            || transaction?.autoGeneratedFromId
+            || transaction?.recurringId
+            || transaction?.bagliTekrarlayanId;
+        if (recurringId) {
+            return {
+                type: 'fixed',
+                title: transaction?.recurringTitle || transaction?.aciklama || transaction?.kategori || 'Sabit gider',
+                badges: [{ label: 'Sabit', tone: 'fixed', icon: CalendarClock }],
+            };
+        }
+
+        return {
+            type: 'normal',
+            title: transaction?.aciklama || transaction?.kategori || 'İşlem',
+            badges: [],
+        };
+    }, [billDefinitionById, installmentById, pendingBillById, subscriptionById]);
     const quickTransactionFormProps = {
         formTab, setFormTab,
         hesaplar,
@@ -653,14 +767,6 @@ const BudgetDashboard = ({
         return count > 0 ? Math.min(paidCount, count) : paidCount;
     }, [linkedInstallmentPaymentCounts]);
 
-    const monthlyInstallmentLoad = (taksitler || []).reduce((acc, item) => {
-        const total = parseAmount(item.toplamTutar);
-        const monthly = parseAmount(item.aylikTutar);
-        const paid = getInstallmentPaidCount(item);
-        const count = parseInt(item.taksitSayisi) || 0;
-        if (count > 0 && paid >= count) return acc;
-        return acc + Math.min(monthly, Math.max(0, total - (monthly * paid)));
-    }, 0);
     const getInstallmentFinancials = useCallback((item) => {
         const total = parseAmount(item.toplamTutar);
         const monthly = parseAmount(item.aylikTutar);
@@ -794,9 +900,17 @@ const BudgetDashboard = ({
     }, [abonelikler, abonelikOde, bekleyenFaturalar, getInstallmentPaidCount, hesaplar, modalAc, selectedPeriod, taksitOde, taksitler, tanimliFaturalar, tumIslemler]);
 
     const recentTransactions = [...(filtrelenmisIslemler || [])]
-        .sort((a, b) => (toDateSafe(b.tarih)?.getTime() || 0) - (toDateSafe(a.tarih)?.getTime() || 0));
-    const filteredTransactionsNet = recentTransactions.reduce((sum, transaction) => {
+        .sort((a, b) => (toDateSafe(b.tarih)?.getTime() || 0) - (toDateSafe(a.tarih)?.getTime() || 0))
+        .map((transaction) => ({
+            ...transaction,
+            presentation: getTransactionNature(transaction),
+        }));
+    const displayedTransactions = recentTransactions.filter((transaction) => (
+        matchesTransactionNatureFilter(transaction, transactionNatureFilter, hesaplar)
+    ));
+    const filteredTransactionsNet = displayedTransactions.reduce((sum, transaction) => {
         const amount = parseAmount(transaction.tutar);
+        if (isCreditCardCashOutTransaction(transaction, hesaplar)) return sum - amount;
         if (transaction.islemTipi === 'gelir') return sum + amount;
         if (transaction.islemTipi === 'gider') return sum - amount;
         return sum;
@@ -821,8 +935,17 @@ const BudgetDashboard = ({
         })
         .filter((item) => !(item.installmentCount > 0 && item.paidCount >= item.installmentCount))
         .sort((a, b) => (a.nextDueDate?.getTime() || Number.MAX_SAFE_INTEGER) - (b.nextDueDate?.getTime() || Number.MAX_SAFE_INTEGER));
-    const installmentRows = allInstallmentRows.slice(0, 8);
-    const installmentRemainingTotal = allInstallmentRows.reduce((sum, item) => sum + item.remainingDebt, 0);
+    const periodInstallmentRows = selectedPeriod?.month === 'all'
+        ? allInstallmentRows
+        : allInstallmentRows.filter((item) => isDueBySelectedPeriodEnd(item.nextDueDate, selectedPeriod));
+    const installmentRows = periodInstallmentRows.slice(0, 8);
+    const installmentRemainingTotal = periodInstallmentRows.reduce((sum, item) => sum + item.remainingDebt, 0);
+    const monthlyInstallmentLoad = periodInstallmentRows.reduce((sum, item) => (
+        sum + Math.min(item.monthly, item.remainingDebt)
+    ), 0);
+    const installmentSectionDescription = selectedPeriod?.month === 'all'
+        ? `${allInstallmentRows.length} aktif taksit`
+        : `${periodInstallmentRows.length} taksit`;
 
     const selectedPeriodNet = toplamGelir - toplamGider;
     const todayNet = todayStats.income - todayStats.expense;
@@ -869,12 +992,23 @@ const BudgetDashboard = ({
         const dueDate = toDateSafe(item.sonOdemeTarihi || item.tarih);
         return isSameCalendarMonth(dueDate, new Date()) ? sum + parseAmount(item.kalanTutar ?? item.tutar) : sum;
     }, 0);
-    const filteredCount = (filtrelenmisIslemler || []).length;
-    const isFiltering = Boolean(aramaMetni) || filtreHesap !== 'Tümü' || filtreKategori !== 'Tümü' || filtreEtiket !== 'Tümü';
+    const filteredCount = displayedTransactions.length;
+    const isFiltering = Boolean(aramaMetni) || filtreHesap !== 'Tümü' || filtreKategori !== 'Tümü' || filtreEtiket !== 'Tümü' || transactionNatureFilter !== 'all';
     const totalComparableTransactions = isFiltering ? (tumIslemler || []).filter(isBudgetTransaction).length : filteredCount;
     const transactionDescription = isFiltering
         ? `${totalComparableTransactions} işlemden ${filteredCount} sonuç`
         : `${filteredCount} işlem`;
+    const financingContext = useMemo(() => ({ transactions: tumIslemler, installments: taksitler }), [tumIslemler, taksitler]);
+    const financingSummary = useMemo(() => summarizeFinancings(finansmanlar, financingContext), [finansmanlar, financingContext]);
+    const financingRows = useMemo(() => (finansmanlar || [])
+        .map((financing) => ({ financing, metrics: getFinancingMetrics(financing, financingContext) }))
+        .sort((a, b) => {
+            if (a.metrics.effectiveStatus !== b.metrics.effectiveStatus) {
+                return a.metrics.effectiveStatus === FINANCING_STATUS.ACTIVE ? -1 : 1;
+            }
+            return (toDateSafe(b.financing.usageDate)?.getTime() || 0) - (toDateSafe(a.financing.usageDate)?.getTime() || 0);
+        })
+        .slice(0, 4), [finansmanlar, financingContext]);
     const accountNameById = useMemo(() => new Map(
         (hesaplar || []).map((account) => [account.id, account.hesapAdi || 'İsimsiz hesap'])
     ), [hesaplar]);
@@ -963,6 +1097,25 @@ const BudgetDashboard = ({
     };
 
     const selectedAccountMovements = historyAccount ? getAccountMovements(historyAccount) : [];
+    const accountMovementEndingBalances = useMemo(() => {
+        if (!historyAccount) return new Map();
+        const allAccountMovements = (tumIslemler || [])
+            .filter((transaction) => transaction.id && (
+                transaction.hesapId === historyAccount.id ||
+                transaction.kaynakId === historyAccount.id ||
+                transaction.hedefId === historyAccount.id
+            ))
+            .sort((a, b) => (toDateSafe(b.tarih)?.getTime() || 0) - (toDateSafe(a.tarih)?.getTime() || 0));
+        let runningBalance = parseAmount(historyAccount.guncelBakiye);
+        const balances = new Map();
+
+        allAccountMovements.forEach((transaction) => {
+            balances.set(transaction.id, runningBalance);
+            runningBalance -= getAccountMovementAmount(transaction, historyAccount.id);
+        });
+
+        return balances;
+    }, [historyAccount, tumIslemler]);
     const selectedSalarySummary = historyAccountIsSalary && salaryHistoryMode === 'salary'
         ? summarizeSalaryPeriod({ transactions: selectedAccountMovements, account: historyAccount, accounts: hesaplar })
         : null;
@@ -1091,7 +1244,7 @@ const BudgetDashboard = ({
                                     className={flowChartMode === 'expense' ? 'is-active' : ''}
                                     onClick={() => setFlowChartMode('expense')}
                                 >
-                                    Günlük Harcama
+                                    Harcama
                                 </button>
                                 <button
                                     type="button"
@@ -1106,7 +1259,7 @@ const BudgetDashboard = ({
                             { key: 'gelir', label: 'Gelir', tone: 'success', color: '#16a36a' },
                             { key: 'gider', label: 'Gider', tone: 'danger', color: '#e25555', fillOpacity: 0.14, fillOpacityEnd: 0.01 },
                         ] : [
-                            { key: 'value', label: 'Gerçek Harcama', tone: 'danger', color: '#e25555', fillOpacity: 0.16, fillOpacityEnd: 0.01 },
+                            { key: 'value', label: 'Harcama', tone: 'danger', color: '#e25555', fillOpacity: 0.16, fillOpacityEnd: 0.01 },
                         ]}
                         summary={flowChartMode === 'cashflow' ? {
                             label: 'Net',
@@ -1116,7 +1269,7 @@ const BudgetDashboard = ({
                             items: [
                                 {
                                     key: 'daily-average',
-                                    label: 'Günlük Ortalama',
+                                    label: selectedPeriod?.month === 'all' ? 'Aylık Ortalama' : 'Günlük Ortalama',
                                     value: formatPara(dailyExpenseAverage),
                                     tone: 'neutral',
                                     showDot: false,
@@ -1143,10 +1296,10 @@ const BudgetDashboard = ({
                                 { label: 'Net', value: formatter(net), tone: getFinancialTone(net) },
                             ];
                         }) : ((item, formatter) => [
-                            { label: 'Gerçek Harcama', value: formatter(parseAmount(item?.value)), tone: 'danger' },
+                            { label: 'Harcama', value: formatter(parseAmount(item?.value)), tone: 'danger' },
                         ])}
-                        emptyTitle={flowChartMode === 'cashflow' ? 'Nakit akışı oluşmadı' : 'Günlük harcama yok'}
-                        emptyDescription={flowChartMode === 'cashflow' ? 'Seçili dönemde gelir veya gider hareketi yok.' : 'Seçili dönemde gerçek tüketim harcaması görünmüyor.'}
+                        emptyTitle={flowChartMode === 'cashflow' ? 'Nakit akışı oluşmadı' : 'Harcama yok'}
+                        emptyDescription={flowChartMode === 'cashflow' ? 'Seçili dönemde gelir veya gider hareketi yok.' : 'Seçili dönemde harcama görünmüyor.'}
                         emptyIcon={LineChart}
                     />
 
@@ -1190,7 +1343,6 @@ const BudgetDashboard = ({
                 <PremiumCard className="qw-transactions-card">
                     <SectionHeader
                         title="Hareket geçmişi"
-                        description={transactionDescription}
                         action={(
                             <div className="qw-export-actions">
                                 <QuickActionButton icon={Download} onClick={excelIndir}>XLS</QuickActionButton>
@@ -1214,9 +1366,12 @@ const BudgetDashboard = ({
                         tagValue={filtreEtiket}
                         onTagChange={setFiltreEtiket}
                         tags={usedTransactionTags}
+                        typeValue={transactionNatureFilter}
+                        onTypeChange={setTransactionNatureFilter}
+                        typeOptions={TRANSACTION_NATURE_OPTIONS}
                     />
                     <div className="qw-transaction-list qw-transaction-list--scroll">
-                        {recentTransactions.map((transaction) => {
+                        {displayedTransactions.map((transaction) => {
                             const isCreditCardCashOut = isCreditCardCashOutTransaction(transaction, hesaplar);
                             const amountTone = transaction.islemTipi === 'gelir'
                                 ? 'success'
@@ -1233,9 +1388,10 @@ const BudgetDashboard = ({
                                     key={transaction.id}
                                     icon={transactionIcon(transaction)}
                                     tone={transactionTone(transaction)}
-                                    title={transaction.aciklama || transaction.kategori || 'İşlem'}
+                                    title={transaction.presentation.title}
                                     meta={getTransactionMeta(transaction)}
                                     tags={transaction.tags || []}
+                                    badges={transaction.presentation.badges}
                                     amount={`${prefix}${formatPara(transaction.tutar)}`}
                                     amountTone={amountTone}
                                     onClick={() => modalAc('duzenle_islem', transaction)}
@@ -1252,10 +1408,13 @@ const BudgetDashboard = ({
                                 />
                             );
                         })}
-                        {recentTransactions.length === 0 && <EmptyState title="İşlem bulunamadı" description="Arama veya kategori filtrenizi değiştirin." icon={Search} />}
+                        {displayedTransactions.length === 0 && <EmptyState title="İşlem bulunamadı" description="Arama veya filtreleri değiştirin." icon={Search} />}
                     </div>
                     <div className="qw-card-sticky-footer">
-                        <span>Filtrelenen işlemler toplamı</span>
+                        <span className="qw-card-sticky-footer__label">
+                            <span>Filtrelenen işlemler toplamı</span>
+                            <small>{transactionDescription}</small>
+                        </span>
                         <strong className={`is-${getFinancialTone(filteredTransactionsNet)}`}>{formatPara(filteredTransactionsNet)}</strong>
                     </div>
                 </PremiumCard>
@@ -1433,7 +1592,7 @@ const BudgetDashboard = ({
                 </PremiumCard>
 
                 <PremiumCard className="qw-module-card">
-                    <SectionHeader title="Taksitler" description={`${allInstallmentRows.length} taksit`} />
+                    <SectionHeader title="Taksitler" description={installmentSectionDescription} />
                     <div className="qw-summary-lines qw-installment-summary">
                         <SummaryLine label="Kalan Taksit Borcu" value={formatPara(installmentRemainingTotal)} tone="purple" />
                         <SummaryLine label="Bu Ay Taksitler" value={formatPara(monthlyInstallmentLoad)} tone="danger" />
@@ -1509,6 +1668,41 @@ const BudgetDashboard = ({
                             />
                         ))}
                         {debtRows.length === 0 && <EmptyState title="Borç kaydı yok" description="Yeni borç ekleyerek takip edebilirsiniz." icon={CreditCard} />}
+                    </div>
+                </PremiumCard>
+
+                <PremiumCard className="qw-module-card">
+                    <SectionHeader
+                        title="Finansmanlar"
+                        description={`${financingSummary.activeCount} aktif finansman`}
+                        action={<QuickActionButton icon={ArrowRight} onClick={() => navigateTo?.('/finansmanlar')}>Tümünü Gör</QuickActionButton>}
+                    />
+                    <div className="qw-summary-lines qw-debt-summary">
+                        <SummaryLine label="Kalan Borç" value={formatFinancingMoney(financingSummary.activeDebt, gizliMod)} tone="danger" />
+                        <SummaryLine label="Bu Ay Ödenecek" value={formatFinancingMoney(financingSummary.monthlyDue, gizliMod)} />
+                    </div>
+                    <div className="qw-module-list qw-module-list--debt">
+                        {financingRows.map(({ financing, metrics }) => {
+                            const isClosed = metrics.effectiveStatus === FINANCING_STATUS.CLOSED;
+                            const nextMeta = metrics.nextPayment
+                                ? `Sonraki: ${formatShortDate(metrics.nextPayment.date)}`
+                                : 'Sonraki ödeme yok';
+                            return (
+                                <ModuleRow
+                                    key={financing.id}
+                                    icon={Landmark}
+                                    tone="purple"
+                                    title={financing.ad || getFinancingTypeLabel(financing.type)}
+                                    meta={isClosed
+                                        ? `${metrics.paidInstallments}/${metrics.installmentCount || '-'} · ${financing.closureType === 'EARLY' ? 'Erken kapatıldı' : 'Kapandı'}`
+                                        : `${metrics.paidInstallments}/${metrics.installmentCount || '-'} ödendi · ${nextMeta}`}
+                                    amount={isClosed ? 'Kapandı' : formatFinancingMoney(metrics.remainingPlannedPayment, gizliMod)}
+                                    amountTone={isClosed ? 'neutral' : 'danger'}
+                                    onClick={() => navigateTo?.(`/finansmanlar/${financing.id}`)}
+                                />
+                            );
+                        })}
+                        {financingRows.length === 0 && <EmptyState title="Finansman yok" description="Kredi ve nakit avans takipleri burada görünür." icon={Landmark} />}
                     </div>
                 </PremiumCard>
             </div>
@@ -1664,6 +1858,7 @@ const BudgetDashboard = ({
                         const movementAmount = getAccountMovementAmount(transaction, historyAccount.id);
                         const amountTone = getFinancialTone(movementAmount);
                         const prefix = movementAmount > 0 ? '+' : movementAmount < 0 ? '-' : '';
+                        const endingBalance = accountMovementEndingBalances.get(transaction.id);
                         return (
                             <TransactionRow
                                 key={transaction.id}
@@ -1674,6 +1869,8 @@ const BudgetDashboard = ({
                                 tags={transaction.tags || []}
                                 amount={`${prefix}${formatPara(Math.abs(movementAmount))}`}
                                 amountTone={amountTone}
+                                balanceLabel="Bakiye"
+                                balanceValue={Number.isFinite(endingBalance) ? formatPara(endingBalance) : null}
                                 onClick={() => modalAc('duzenle_islem', transaction)}
                                 actions={(
                                     <>

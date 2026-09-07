@@ -16,6 +16,7 @@ export const useDataListeners = (user, alanKodu) => {
     const [bekleyenFaturalar, setBekleyenFaturalar] = useState([]);
     const [tanimliFaturalar, setTanimliFaturalar] = useState([]);
     const [borclar, setBorclar] = useState([]);
+    const [finansmanlar, setFinansmanlar] = useState([]);
     const [cariIslemler, setCariIslemler] = useState([]);
     const [besVerisi, setBesVerisi] = useState(null);
     const [hedefler, setHedefler] = useState([]);
@@ -37,7 +38,7 @@ export const useDataListeners = (user, alanKodu) => {
     useEffect(() => {
         if (!user || !alanKodu) {
             // Temizle
-            setHesaplar([]); setRawIslemler([]); setEtiketler([]); setTransactionTags([]); setAbonelikler([]); setTaksitler([]); setMaaslar([]); setPortfoy([]); setBekleyenFaturalar([]); setTanimliFaturalar([]); setBorclar([]); setCariIslemler([]);
+            setHesaplar([]); setRawIslemler([]); setEtiketler([]); setTransactionTags([]); setAbonelikler([]); setTaksitler([]); setMaaslar([]); setPortfoy([]); setBekleyenFaturalar([]); setTanimliFaturalar([]); setBorclar([]); setFinansmanlar([]); setCariIslemler([]);
             return;
         }
 
@@ -52,6 +53,7 @@ export const useDataListeners = (user, alanKodu) => {
         const qFaturalar = query(collection(db, "bekleyen_faturalar"), where("alanKodu", "==", alanKodu));
         const qFaturaTanim = query(collection(db, "fatura_tanimlari"), where("alanKodu", "==", alanKodu));
         const qBorclar = query(collection(db, "borclar"), where("alanKodu", "==", alanKodu));
+        const qFinansmanlar = query(collection(db, "finansmanlar"), where("alanKodu", "==", alanKodu));
         const qCariIslemler = query(collection(db, "cari_islemleri"), where("alanKodu", "==", alanKodu));
 
         // TEK REFERANS: Kullanıcının kendi ayar dokümanı (hem limitler hem BES verisi burada)
@@ -98,6 +100,9 @@ export const useDataListeners = (user, alanKodu) => {
         const uBorc = onSnapshot(qBorclar, (s) => {
             if (s && s.docs) setBorclar(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+        const uFinansman = onSnapshot(qFinansmanlar, (s) => {
+            if (s && s.docs) setFinansmanlar(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
         const uCari = onSnapshot(qCariIslemler, (s) => {
             if (s && s.docs) {
                 const v = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -139,7 +144,7 @@ export const useDataListeners = (user, alanKodu) => {
             }
         });
 
-        return () => { u1(); u2(); uTags(); uTransactionTags(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); uBorc(); uCari(); }
+        return () => { u1(); u2(); uTags(); uTransactionTags(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); uBorc(); uFinansman(); uCari(); }
     }, [user, alanKodu]);
 
     const islemler = useMemo(() => {
@@ -166,7 +171,7 @@ export const useDataListeners = (user, alanKodu) => {
     }, [rawIslemler, etiketler, transactionTags]);
 
     return {
-        hesaplar, islemler, abonelikler, taksitler, maaslar, portfoy, bekleyenFaturalar, tanimliFaturalar, besVerisi, borclar, cariIslemler,
+        hesaplar, islemler, abonelikler, taksitler, maaslar, portfoy, bekleyenFaturalar, tanimliFaturalar, besVerisi, borclar, finansmanlar, cariIslemler,
         etiketler, transactionTags,
         kategoriListesi, setKategoriListesi,
         yatirimTurleri, setYatirimTurleri,

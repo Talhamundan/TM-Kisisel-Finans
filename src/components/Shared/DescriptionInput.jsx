@@ -1,6 +1,17 @@
 import React, { useMemo, useState } from 'react';
 
-const normalizeText = (value) => String(value || '').trim().toLocaleLowerCase('tr-TR');
+const normalizeText = (value) => String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLocaleLowerCase('tr-TR');
+
+const normalizeDescriptionLabel = (value) => String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const DescriptionInput = ({
     value,
@@ -21,7 +32,7 @@ const DescriptionInput = ({
         const uniqueDescriptions = [];
 
         (historyItems || []).forEach(item => {
-            const description = String(item?.aciklama || '').trim();
+            const description = normalizeDescriptionLabel(item?.aciklama);
             if (!description) return;
 
             const key = normalizeText(description);

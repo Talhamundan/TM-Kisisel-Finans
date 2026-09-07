@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { ayIsmiGetir, normalizeAssetType, toDateSafe } from '../utils/helpers';
 import { useNotifications } from './useNotifications';
 import { isDateInPeriod, MONTH_NAMES, periodLabel } from '../utils/period';
-import { classifySalaryMovement } from '../utils/salaryPeriod';
 
 const formatDayMonthWeekday = (date) => {
     if (!date) return 'Tarih yok';
@@ -127,8 +126,11 @@ export const useCalculations = (
 
     // Charts
     const kategoriVerisi = filtrelenmisIslemler.filter(i => i.islemTipi === 'gider' && i.kategori !== 'Transfer').reduce((acc, curr) => { const mevcut = acc.find(item => item.name === curr.kategori); if (mevcut) { mevcut.value += curr.tutar; } else { acc.push({ name: curr.kategori, value: curr.tutar }); } return acc; }, []);
-    const realExpenseTransactions = filtrelenmisIslemler.filter((transaction) => (
-        classifySalaryMovement(transaction, transaction.hesapId || transaction.kaynakId, hesaplar) === 'realExpense'
+    const expenseChartTransactions = filtrelenmisIslemler.filter((transaction) => (
+        transaction.islemTipi === 'gider' &&
+        transaction.kategori !== 'Transfer' &&
+        transaction.kategori !== 'Yatırım' &&
+        transaction.kategori !== 'BES'
     ));
     const dailyExpenseDataset = (() => {
         const today = new Date();
@@ -172,7 +174,7 @@ export const useCalculations = (
                 };
             });
 
-        realExpenseTransactions.forEach((curr) => {
+        expenseChartTransactions.forEach((curr) => {
                 const d = toDateSafe(curr.tarih);
                 if (!d) return;
                 const index = selectedPeriod.month === 'all' ? d.getMonth() : d.getDate() - 1;
@@ -186,13 +188,13 @@ export const useCalculations = (
 
     let gunlukOrtalama = 0;
     {
-        const realExpenseTotal = realExpenseTransactions.reduce((acc, item) => acc + (parseFloat(item.tutar) || 0), 0);
+        const expenseChartTotal = gunlukVeri.reduce((acc, item) => acc + (parseFloat(item.value) || 0), 0);
         if (selectedPeriod.month === 'all') {
-            const veriBulunanAySayisi = gunlukVeri.filter((item) => item.value > 0).length || 1;
-            gunlukOrtalama = realExpenseTotal / veriBulunanAySayisi;
+            const aySayisi = Math.max(1, gunlukVeri.length || 1);
+            gunlukOrtalama = expenseChartTotal / aySayisi;
         } else {
             const gunSayisi = Math.max(1, gunlukVeri.length || 1);
-            gunlukOrtalama = realExpenseTotal / gunSayisi;
+            gunlukOrtalama = expenseChartTotal / gunSayisi;
         }
     }
 
